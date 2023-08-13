@@ -8,6 +8,18 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 
 #####################################################
+# SETUP CONSOLEGL-CONSOLEDOCK
+#####################################################
+file(GLOB CONSOLEGL_CONSOLE_DOCK_SOURCE_FILES ./ConsoleGL-ConsoleDock/*.cpp)
+source_group("Source Files" FILES CONSOLE_DOCK_SOURCE_FILES})
+add_compile_definitions(NOMINMAX)
+add_compile_definitions(UNICODE)
+
+add_executable(ConsoleGL-ConsoleDock
+	${CONSOLEGL_CONSOLE_DOCK_SOURCE_FILES})
+
+
+#####################################################
 # SETUP CONSOLEGL-CORE
 #####################################################
 file(GLOB CONSOLEGL_CORE_SOURCE_FILES ./ConsoleGL-Core/Include/ConsoleGL/*.cpp)
@@ -20,17 +32,9 @@ add_compile_definitions(UNICODE)
 add_library(ConsoleGL-Core STATIC 
 	${CONSOLEGL_CORE_SOURCE_FILES}
 	${CONSOLEGL_CORE_HEADER_FILES})
-
-#####################################################
-# SETUP CONSOLEDOCK
-#####################################################
-file(GLOB CONSOLE_DOCK_SOURCE_FILES ./ConsoleDock/*.cpp)
-source_group("Source Files" FILES CONSOLE_DOCK_SOURCE_FILES})
-add_compile_definitions(NOMINMAX)
-add_compile_definitions(UNICODE)
-
-add_executable(ConsoleDock
-	${CONSOLE_DOCK_SOURCE_FILES})
+target_include_directories(ConsoleGL-Core PUBLIC
+	${PROJECT_BINARY_DIR}
+	${PROJECT_SOURCE_DIR}/ConsoleGL-Core/Include)
 
 
 #####################################################

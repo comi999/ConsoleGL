@@ -1,6 +1,0 @@
-C:/Users/lfarag/source/repos/ConsoleGL/Built/CMakeFiles/ConsoleGL-Core.dir
-C:/Users/lfarag/source/repos/ConsoleGL/Built/CMakeFiles/ConsoleDock.dir
-C:/Users/lfarag/source/repos/ConsoleGL/Built/CMakeFiles/ConsoleGL-Shaders.dir
-C:/Users/lfarag/source/repos/ConsoleGL/Built/CMakeFiles/ConsoleGL-Example.dir
-C:/Users/lfarag/source/repos/ConsoleGL/Built/CMakeFiles/ALL_BUILD.dir
-C:/Users/lfarag/source/repos/ConsoleGL/Built/CMakeFiles/ZERO_CHECK.dir
