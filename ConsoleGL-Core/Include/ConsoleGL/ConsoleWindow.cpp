@@ -39,6 +39,24 @@ ConsoleGL::Window* ConsoleGL::Window::Create( const std::string& a_Title, uint32
     NewWindow->m_Title = a_Title;
     std::wstring Title( a_Title.begin(), a_Title.end() );
 
+    auto ProcessCreationEvent = CreateEvent( NULL, false, false, ( L"console_dock_event_" + Title ).c_str() );
+
+    if ( ProcessCreationEvent == NULL )
+    {
+        SetActive( PreWindow );
+        Destroy( NewWindow );
+        return nullptr;
+    }
+
+    auto ProcessCompletedEvent = CreateEvent( NULL, false, false, ( L"process_completed_" + Title ).c_str() );
+
+    if ( ProcessCompletedEvent == NULL )
+    {
+        SetActive( PreWindow );
+        Destroy( NewWindow );
+        return nullptr;
+    }
+
     CreateProcess(
         CONSOLE_DOCK_PROCESS_PATH,
         Title.data(),
@@ -51,14 +69,14 @@ ConsoleGL::Window* ConsoleGL::Window::Create( const std::string& a_Title, uint32
         &NewWindow->m_StartupInfo,
         &NewWindow->m_ProcessInfo );
 
-    // Sleep a bit for process to start up properly. Ideally, this should be an event wait on the process.
-    Sleep( 100 );
+    // Wait for process to complete creation.
+    WaitForSingleObject( ProcessCompletedEvent, -1 );
 
     // Temporarily attach new console to set it's data.
     AttachConsole( NewWindow->m_ProcessInfo.dwProcessId );
+    NewWindow->m_ConsoleProcessID = NewWindow->m_ProcessInfo.dwProcessId;
     NewWindow->m_ConsoleOutputHandle = GetStdHandle( STD_OUTPUT_HANDLE );
     NewWindow->m_ConsoleInputHandle = GetStdHandle( STD_INPUT_HANDLE );
-    NewWindow->m_ConsoleProcessID = NewWindow->m_ProcessInfo.dwProcessId;
     NewWindow->m_WindowHandle = GetConsoleWindow();
 
     // Set console font.
@@ -77,18 +95,7 @@ ConsoleGL::Window* ConsoleGL::Window::Create( const std::string& a_Title, uint32
     CONSOLE_SCREEN_BUFFER_INFOEX ScreenBufferInfo;
     ScreenBufferInfo.cbSize = sizeof( ScreenBufferInfo );
     GetConsoleScreenBufferInfoEx( NewWindow->m_ConsoleOutputHandle, &ScreenBufferInfo );
-
-    // Set the colours for the console to the seed colours.
-    /*for ( int i = 0; i < 16; ++i )
-    {
-        COLORREF& ColourRef = ScreenBufferInfo.ColorTable[ i ];
-        Colour SeedColour = PixelColourMap::SeedColours[ i ];
-        ColourRef =
-            SeedColour.B << 16 |
-            SeedColour.G << 8  |
-            SeedColour.R;
-    }*/
-
+    //// set colours here
     SetConsoleScreenBufferInfoEx( NewWindow->m_ConsoleOutputHandle, &ScreenBufferInfo );
 
     // Get largest possible window size that can fit on screen.
@@ -98,6 +105,7 @@ ConsoleGL::Window* ConsoleGL::Window::Create( const std::string& a_Title, uint32
     if ( LargestWindow.X < a_Width ||
         LargestWindow.Y < a_Height )
     {
+        SetActive( PreWindow );
         Destroy( NewWindow );
         return nullptr;
     }
@@ -106,18 +114,14 @@ ConsoleGL::Window* ConsoleGL::Window::Create( const std::string& a_Title, uint32
     NewWindow->m_Width = a_Width;
     NewWindow->m_Height = a_Height;
 
-    // Set screen buffer.
-    //NewWindow->m_ScreenBuffer.Initialize( a_Size );
-    COORD WindowSize = { a_Width, a_Height };
-
     // Set window region rect.
     NewWindow->m_WindowRegion.Left = 0;
     NewWindow->m_WindowRegion.Top = 0;
-    NewWindow->m_WindowRegion.Right = WindowSize.X - 1;
-    NewWindow->m_WindowRegion.Bottom = WindowSize.Y - 1;
+    NewWindow->m_WindowRegion.Right = a_Width - 1;
+    NewWindow->m_WindowRegion.Bottom = a_Height - 1;
 
     // Set console attributes.
-    SetConsoleScreenBufferSize( NewWindow->m_ConsoleOutputHandle, LargestWindow );// { ( short )a_Width, ( short )a_Height } );
+    SetConsoleScreenBufferSize( NewWindow->m_ConsoleOutputHandle, LargestWindow );
     SetConsoleWindowInfo( NewWindow->m_ConsoleOutputHandle, true, &NewWindow->m_WindowRegion );
     GetConsoleScreenBufferInfoEx( NewWindow->m_ConsoleOutputHandle, &ScreenBufferInfo );
     SetConsoleScreenBufferSize( NewWindow->m_ConsoleOutputHandle, { ( short )a_Width, ( short )a_Height } );
@@ -140,25 +144,10 @@ ConsoleGL::Window* ConsoleGL::Window::Create( const std::string& a_Title, uint32
     for ( auto& Buffer : NewWindow->m_Buffers )
     {
         Buffer = new Pixel[ NewWindow->m_Width * NewWindow->m_Height ];
+        memset( Buffer, 0, sizeof( Pixel ) * NewWindow->m_Width * NewWindow->m_Height );
     }
 
-    //NewWindow->m_Thread = new Thread( []( Window* a_ConsoleWindow )
-    //{
-    //    while ( true )
-    //    {
-    //        std::unique_lock< std::mutex > Locker( a_ConsoleWindow->m_Mutex );
-    //        a_ConsoleWindow->m_ConditionVariable.wait( Locker );
-
-    //        if ( a_ConsoleWindow->m_BufferReady )
-    //        {
-    //            //a_ConsoleWindow->WriteBuffer();
-    //            a_ConsoleWindow->m_BufferReady = false;
-    //        }
-    //    }
-    //}, NewWindow );
-
     // Return the attached console to the active window.
-    //SetActive( PreWindow );
     FreeConsole();
 
     if ( PreWindow )
@@ -267,14 +256,12 @@ void ConsoleGL::Window::SwapBuffer()
         }
     }
 
-    bool Success = WriteConsoleOutput(
-        s_Active->m_ConsoleOutputHandle,
+    WriteConsoleOutput(
+        GetStdHandle( STD_OUTPUT_HANDLE ),
         ( CHAR_INFO* )s_Active->m_Buffers[ IndexToDraw ],
         { ( short )s_Active->m_Width, ( short )s_Active->m_Height },
         { 0, 0 },
-        & s_Active->m_WindowRegion );
-
-    return ( void )Success;
+        &s_Active->m_WindowRegion );
 }
 
 void ConsoleGL::Window::SetBuffer( Pixel a_Pixel )
@@ -284,10 +271,7 @@ void ConsoleGL::Window::SetBuffer( Pixel a_Pixel )
 
 void ConsoleGL::Window::SetRect( uint32_t a_X, uint32_t a_Y, uint32_t a_Width, uint32_t a_Height, Pixel a_Pixel )
 {
-    uint32_t Start = a_X + a_Y * s_Active->m_Width;
-    uint32_t End = Start + a_Y * a_Height;
-    
-    for ( ; Start < End; Start += s_Active->m_Width )
+    for ( uint32_t y = 0, Start = a_X + a_Y * s_Active->m_Width; y < a_Height; ++y, Start += s_Active->m_Width )
     {
         SetPixels( Start, a_Width, a_Pixel );
     }
@@ -306,7 +290,6 @@ void ConsoleGL::Window::SetPixel( uint32_t a_X, uint32_t a_Y, Pixel a_Pixel )
 void ConsoleGL::Window::SetPixels( uint32_t a_Index, uint32_t a_Count, Pixel a_Pixel )
 {
     Pixel* Buffer = s_Active->m_Buffers[ s_Active->m_ActiveBuffer ] + a_Index;
-    //memset( Buffer, *reinterpret_cast< int* >( &a_Pixel ), sizeof( Pixel ) * a_Count );
 
     for ( int i = 0; i < a_Count; ++i )
     {

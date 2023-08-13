@@ -231,7 +231,11 @@
 #include <ConsoleGL/Pixel.hpp>
 
 #ifndef CONSOLE_DOCK_PROCESS_PATH
-    #define CONSOLE_DOCK_PROCESS_PATH L"Debug/ConsoleGL-ConsoleDock.exe"
+#ifdef _DEBUG
+    #define CONSOLE_DOCK_PROCESS_PATH L"Release/ConsoleGL-ConsoleDock.exe"
+#else
+    #define CONSOLE_DOCK_PROCESS_PATH L"Release/ConsoleGL-ConsoleDock.exe"
+#endif
 #endif
 
 namespace ConsoleGL
