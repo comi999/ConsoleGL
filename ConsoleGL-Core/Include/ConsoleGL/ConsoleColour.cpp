@@ -1,1 +1,0 @@
-#include <ConsoleGL/ConsoleColour.hpp>

@@ -1,6 +1,6 @@
 #pragma once
 #include <Windows.h>
-#include <ConsoleGL/ConsoleColour.hpp>
+#include <ConsoleGL/Colour.hpp>
 
 namespace ConsoleGL
 {
@@ -23,19 +23,15 @@ namespace ConsoleGL
 		Pixel& operator=( const Pixel& ) = default;
 		Pixel& operator=( Pixel&& ) = default;
 		Pixel( BaseType a_Base ) : BaseType( a_Base ) {}
-		Pixel( ConsoleColour a_ConsoleColour )
-		{
-			BaseType::Char.UnicodeChar = 0x20; // space
-			SetBackground( a_ConsoleColour );
-		}
+		Pixel( EConsoleColour a_ConsoleColour ) { BaseType::Char.UnicodeChar = 0x20; SetBackground( a_ConsoleColour ); }
 
 		AsciiType& Ascii() { return Char.AsciiChar; }
 		UnicodeType& Unicode() { return Char.UnicodeChar; }
 		WordType& Attributes() { return CHAR_INFO::Attributes; }
-		ConsoleColour GetForeground() { return static_cast< ConsoleColour >( 0xF & CHAR_INFO::Attributes ); }
-		ConsoleColour GetBackgroundColour() { return static_cast< ConsoleColour >( ( 0xF0 & CHAR_INFO::Attributes ) >> 4 ); }
-		void SetForeground( ConsoleColour a_ConsoleColour ) { CHAR_INFO::Attributes &= 0xFFF0; CHAR_INFO::Attributes |= static_cast< WORD >( a_ConsoleColour ); }
-		void SetBackground( ConsoleColour a_ConsoleColour ) { CHAR_INFO::Attributes &= 0xFF0F; CHAR_INFO::Attributes |= static_cast< WORD >( a_ConsoleColour ) << 4; }
+		EConsoleColour GetForeground() { return static_cast< EConsoleColour >( 0xF & CHAR_INFO::Attributes ); }
+		EConsoleColour GetBackgroundColour() { return static_cast< EConsoleColour >( ( 0xF0 & CHAR_INFO::Attributes ) >> 4 ); }
+		void SetForeground( EConsoleColour a_ConsoleColour ) { CHAR_INFO::Attributes &= 0xFFF0; CHAR_INFO::Attributes |= static_cast< WORD >( a_ConsoleColour ); }
+		void SetBackground( EConsoleColour a_ConsoleColour ) { CHAR_INFO::Attributes &= 0xFF0F; CHAR_INFO::Attributes |= static_cast< WORD >( a_ConsoleColour ) << 4; }
 		operator BaseType& () { return *this; }
 		operator const BaseType& () const { return *this; }
 

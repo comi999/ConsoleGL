@@ -1,25 +1,38 @@
 #include <iostream>
 
-#include <ConsoleGL/ConsoleWindow.hpp>
-#include <ConsoleGL/ConsoleColour.hpp>
+#include <ConsoleGL/Window.hpp>
+#include <ConsoleGL/Colour.hpp>
 
 using Window = ConsoleGL::Window;
+using Pixel = ConsoleGL::Pixel;
+using Colour = ConsoleGL::Colour;
+using EConsoleColour = ConsoleGL::EConsoleColour;
 
 INT WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, INT nCmdShow )
 {
-	auto window = Window::Create( "Window", 125, 125, 8, 8 );
+	Window* window = Window::Create( "window", 100, 100, 8, 8 );
 	Window::SetActive( window );
-	float i = 0;
-	while ( true )
+
+	auto buff = window->GetBuffer();
+	
+	for ( int i = 0; i < window->GetArea(); ++i )
 	{
-		i += 0.001f;
-		float c = cos( i );
-		Window::SetBuffer( ConsoleGL::ConsoleColour::RED );
-		Window::SetRect( 64 + c * 10, 64, 30, 30, ConsoleGL::ConsoleColour::GREEN );
-		Window::SwapBuffer();
+		if ( i % 2 == 0 )
+		{
+			buff[ i ] = EConsoleColour::MAGENTA;
+		}
+		else
+		{
+			buff[ i ] = EConsoleColour::YELLOW;
+		}
 	}
 
-	Window::Destroy();
+	Colour c0 = { 1, 2, 3, 4 };
+	c0 += { 2, 3, 4, 5 };
 
+	auto r = 10 * c0;
+
+	Window::SwapBuffer();
+	Window::Destroy( window );
 	return 0;
 }

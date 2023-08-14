@@ -257,19 +257,28 @@ public:
     Window& operator=( Window&& ) = delete;
 
     static Window* Create( const std::string& a_Title, uint32_t a_Width, uint32_t a_Height, uint32_t a_PixelWidth = 8, uint32_t a_PixelHeight = 8, uint32_t a_BufferCount = 2 );
-    static void Destroy();
     static void Destroy( Window* a_Window );
     static void SetActive( Window* a_ConsoleWindow );
     static Window* GetActive() { return s_Active; }
     static void SetTitle( const std::string& a_Title );
-    static void SetTitle( Window* a_Window, const std::string& a_Title );
     static void SwapBuffer();
-    static void SetBuffer( Pixel a_Pixel );
-    static void SetRect( uint32_t a_X, uint32_t a_Y, uint32_t a_Width, uint32_t a_Height, Pixel a_Pixel );
-    static void SetPixel( uint32_t a_Index, Pixel a_Pixel );
-    static void SetPixel( uint32_t a_X, uint32_t a_Y, Pixel a_Pixel ); 
-    static void SetPixels( uint32_t a_Index, uint32_t a_Count, Pixel a_Pixel );
-    static void SetPixels( uint32_t a_X, uint32_t a_Y, uint32_t a_Count, Pixel a_Pixel );
+    static void SwapBuffer( uint32_t a_Index );
+
+    uint32_t GetWidth() const { return m_Width; }
+    uint32_t GetHeight() const { return m_Height; }
+    uint32_t GetArea() const { return m_Width * m_Height; }
+    uint32_t GetBufferIndex() const { return m_ActiveBuffer; }
+    uint32_t GetBufferCount() const { return m_Buffers.size(); }
+    Pixel* GetBuffer() { return m_Buffers[ m_ActiveBuffer ]; }
+    const Pixel* GetBuffer() const { return m_Buffers[ m_ActiveBuffer ]; }
+    Pixel* GetBuffer( uint32_t a_Index ) { return m_Buffers[ a_Index ]; }
+    const Pixel* GetBuffer( uint32_t a_Index ) const { return m_Buffers[ a_Index ]; }
+    void SetBuffer( Pixel a_Pixel );
+    void SetRect( uint32_t a_X, uint32_t a_Y, uint32_t a_Width, uint32_t a_Height, Pixel a_Pixel );
+    void SetPixel( uint32_t a_Index, Pixel a_Pixel );
+    void SetPixel( uint32_t a_X, uint32_t a_Y, Pixel a_Pixel );
+    void SetPixels( uint32_t a_Index, uint32_t a_Count, Pixel a_Pixel );
+    void SetPixels( uint32_t a_X, uint32_t a_Y, uint32_t a_Count, Pixel a_Pixel );
 
 private:
     
