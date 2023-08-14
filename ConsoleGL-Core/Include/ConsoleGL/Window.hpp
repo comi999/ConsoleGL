@@ -231,11 +231,11 @@
 #include <ConsoleGL/Pixel.hpp>
 
 #ifndef CONSOLE_DOCK_PROCESS_PATH
-#ifdef _DEBUG
-    #define CONSOLE_DOCK_PROCESS_PATH L"Release/ConsoleGL-ConsoleDock.exe"
-#else
-    #define CONSOLE_DOCK_PROCESS_PATH L"Release/ConsoleGL-ConsoleDock.exe"
-#endif
+    #ifdef _DEBUG
+        #define CONSOLE_DOCK_PROCESS_PATH L"Debug/ConsoleGL-ConsoleDock.exe"
+    #else
+        #define CONSOLE_DOCK_PROCESS_PATH L"Release/ConsoleGL-ConsoleDock.exe"
+    #endif
 #endif
 
 namespace ConsoleGL
@@ -300,11 +300,5 @@ private:
     uint32_t                    m_ActiveBuffer;
     std::string                 m_Title;
     static Window*              s_Active;
-
-    //bool                      m_BufferReady;
-    //ScreenBuffer              m_ScreenBuffer;
-    //Thread*                   m_Thread;
-    //std::condition_variable   m_ConditionVariable;
-    //std::mutex                m_Mutex;
 };
 } // namespace ConsoleGL

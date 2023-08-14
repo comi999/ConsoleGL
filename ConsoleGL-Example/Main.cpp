@@ -27,11 +27,6 @@ INT WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine
 		}
 	}
 
-	Colour c0 = { 1, 2, 3, 4 };
-	c0 += { 2, 3, 4, 5 };
-
-	auto r = 10 * c0;
-
 	Window::SwapBuffer();
 	Window::Destroy( window );
 	return 0;
