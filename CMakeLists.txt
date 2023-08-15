@@ -59,18 +59,14 @@ add_library(ConsoleGL-Shaders SHARED
 # SETUP CONSOLEGL-PIXELMAPGENERATOR
 #####################################################
 file(GLOB CONSOLEGL_PIXELMAPGENERATOR_FILES ./ConsoleGL-PixelMapGenerator/*.cpp)
-source_group("Shader Files" FILES ${CONSOLEGL_PIXELMAPGENERATOR_FILES})
+source_group("Source Files" FILES ${CONSOLEGL_PIXELMAPGENERATOR_FILES})
 file(RELATIVE_PATH PIXEL_MAP_OUTPUT_PATH ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/ConsoleGL-Core/Include/ConsoleGL/)
 add_compile_definitions(OUTPUT_PATH="${PIXEL_MAP_OUTPUT_PATH}/PixelMap.inl")
 add_compile_definitions(NOMINMAX)
 add_compile_definitions(UNICODE)
 
 add_executable(ConsoleGL-PixelMapGenerator
-	${CONSOLEGL_PIXELMAPGENERATOR_FILES}
-	${PROJECT_SOURCE_DIR}/ConsoleGL-Core/Include)
-
-target_include_directories(ConsoleGL-PixelMapGenerator PUBLIC
-	${PROJECT_SOURCE_DIR}/ConsoleGL-Core/Include)
+	${CONSOLEGL_PIXELMAPGENERATOR_FILES})
 
 
 #####################################################
