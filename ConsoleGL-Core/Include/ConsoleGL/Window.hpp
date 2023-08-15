@@ -229,6 +229,7 @@
 #include <Windows.h>
 
 #include <ConsoleGL/Pixel.hpp>
+#include <ConsoleGL/Colour.hpp>
 
 #ifndef CONSOLE_DOCK_PROCESS_PATH
     #ifdef _DEBUG
@@ -260,7 +261,8 @@ public:
     static void Destroy( Window* a_Window );
     static void SetActive( Window* a_ConsoleWindow );
     static Window* GetActive() { return s_Active; }
-    static void SetTitle( const std::string& a_Title );
+    static void SetTitle( const std::string& a_Title ); 
+    static void SetColours( const Colour* a_Colours );
     static void SwapBuffer();
     static void SwapBuffer( uint32_t a_Index );
 

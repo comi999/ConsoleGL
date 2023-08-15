@@ -203,6 +203,35 @@ void ConsoleGL::Window::SetTitle( const std::string& a_Title )
     s_Active->m_Title = a_Title;
 }
 
+void ConsoleGL::Window::SetColours( const ConsoleGL::Colour* a_Colours )
+{
+    if ( !s_Active || !a_Colours )
+    {
+        return;
+    }
+
+    auto OutputHandle = GetStdHandle( STD_OUTPUT_HANDLE );
+
+    if ( OutputHandle == INVALID_HANDLE_VALUE )
+    {
+        return;
+    }
+
+    CONSOLE_SCREEN_BUFFER_INFOEX ScreenBufferInfo;
+    ScreenBufferInfo.cbSize = sizeof( ScreenBufferInfo );
+    GetConsoleScreenBufferInfoEx( OutputHandle, &ScreenBufferInfo );
+
+    for ( int i = 0; i < 16; ++i )
+    {
+        ScreenBufferInfo.ColorTable[ i ] =
+            static_cast< uint32_t >( a_Colours[ i ].b ) << 16 |
+            static_cast< uint32_t >( a_Colours[ i ].g ) << 8 |
+            static_cast< uint32_t >( a_Colours[ i ].r );
+    }
+
+    SetConsoleScreenBufferInfoEx( OutputHandle, &ScreenBufferInfo);
+}
+
 void ConsoleGL::Window::SwapBuffer()
 {
     uint32_t IndexToDraw = s_Active->m_ActiveBuffer;
