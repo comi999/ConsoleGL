@@ -11,7 +11,7 @@ using EConsoleColour = ConsoleGL::EConsoleColour;
 
 INT WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, INT nCmdShow )
 {
-	Window* window = Window::Create( "window", 128, 128, 8, 8 );
+	Window* window = Window::Create( "window", 128, 128, 4, 4 );
 	Window::SetActive( window );
 
 	Colour seedColours[ 16 ]
@@ -100,11 +100,6 @@ INT WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine
 		Sleep( 100 );
 		Window::SwapBuffer();
 	}
-
-
-	constexpr Colour c = { 100, 0, 100 };
-
-	constexpr uint32_t b = ( uint32_t )c;
 
 	Window::Destroy( window );
 	return 0;

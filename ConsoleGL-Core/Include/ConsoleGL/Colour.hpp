@@ -46,7 +46,7 @@ namespace ConsoleGL
 
 	struct Colour
 	{
-		uint8_t r, g, b, a;
+		uint8_t a, r, g, b;
 
 		constexpr Colour() : r( 0u ), g( 0u ), b( 0u ), a( 255u ) {}
 
@@ -62,7 +62,6 @@ namespace ConsoleGL
 		Colour operator*( float a_Scalar ) const;
 		Colour& operator*=( Colour a_Colour );
 		Colour& operator*=( float a_Scalar );
-		constexpr operator uint32_t() const { return ( *reinterpret_cast< const uint32_t* >( this ) ) >> 8u; }
 	};
 } // namespace ConsoleGL
 

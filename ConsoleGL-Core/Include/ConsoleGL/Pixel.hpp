@@ -28,7 +28,7 @@ namespace ConsoleGL
 		Pixel& operator=( Pixel&& ) = default;
 		Pixel( BaseType a_Base ) : BaseType( a_Base ) {}
 		Pixel( EConsoleColour a_ConsoleColour ) { *this = Empty; SetBackground( a_ConsoleColour ); }
-		Pixel( Colour a_Colour ) { *this = reinterpret_cast< const Pixel* >( PixelMap )[ a_Colour.r * 256u * 256u + a_Colour.g * 256u + a_Colour.b ]; }
+		Pixel( Colour a_Colour ) { *this = ( ( const Pixel* )PixelMap )[ *( uint32_t* )&a_Colour >> 8u ]; }
 		AsciiType& Ascii() { return Char.AsciiChar; }
 		UnicodeType& Unicode() { return Char.UnicodeChar; }
 		WordType& Attributes() { return CHAR_INFO::Attributes; }

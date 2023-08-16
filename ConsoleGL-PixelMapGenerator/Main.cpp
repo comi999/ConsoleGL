@@ -2,7 +2,7 @@
 #include <string>
 #include <Windows.h>
 
-struct Colour { uint8_t r, g, b; };
+struct Colour { uint8_t a, r, g, b; };
 
 class PixelMapGenerator
 {
@@ -125,18 +125,22 @@ void PixelMapGenerator::Init()
 		}
 	}
 
-	for ( uint32_t r = 0u; r < 256u; ++r )
-	for ( uint32_t g = 0u; g < 256u; ++g )
-	for ( uint32_t b = 0u; b < 256u; ++b )
+	for ( uint32_t i = 0u; i < 256u * 256u * 256u; ++i )
 	{
+		Colour c;
+		{
+			uint32_t Index = i << 8u;
+			c = *( Colour* )&Index; 
+		}
+		 
 		uint32_t MinDistSqrd = -1;
 		PixelType Closest;
 		
 		for ( Colour Seed : Seeds )
 		{
-			int32_t DiffR = r - Seed.r;
-			int32_t DiffG = g - Seed.g;
-			int32_t DiffB = b - Seed.b;
+			int32_t DiffR = c.r - Seed.r;
+			int32_t DiffG = c.g - Seed.g;
+			int32_t DiffB = c.b - Seed.b;
 
 			DiffR *= DiffR;
 			DiffG *= DiffG;
@@ -157,7 +161,7 @@ void PixelMapGenerator::Init()
 			}
 		}
 
-		PixelAt( Colour{ ( uint8_t )r, ( uint8_t )g, ( uint8_t )b } ) = Closest;
+		PixelAt( c ) = Closest;
 	}
 }
 
