@@ -241,6 +241,14 @@
 
 namespace ConsoleGL
 {
+enum class EColourSet
+{
+    DEFAULT,
+    LEGACY,
+    GREYSCALE,
+    SEPIA,
+};
+
 class Window
 {
 private:
@@ -251,6 +259,11 @@ private:
     typedef SMALL_RECT  WindowRegion;
 
 public:
+
+    static const Colour ColourSetDefault[ 16 ];
+    static const Colour ColourSetLegacy[ 16 ];
+    static const Colour ColourSetGreyscale[ 16 ];
+    static const Colour ColourSetSepia[ 16 ];
 
     Window( const Window& ) = delete;
     Window( Window&& ) = delete;

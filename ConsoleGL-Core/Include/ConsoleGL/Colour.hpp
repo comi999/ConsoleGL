@@ -23,7 +23,7 @@ namespace ConsoleGL
 		YELLOW = DARK_GREY | DARK_YELLOW,
 		WHITE = BLUE | DARK_YELLOW
 	};
-	
+
 	static const EConsoleColour ConsoleColourTable[ 16 ]
 	{
 		ConsoleGL::EConsoleColour::BLACK,
@@ -62,6 +62,7 @@ namespace ConsoleGL
 		Colour operator*( float a_Scalar ) const;
 		Colour& operator*=( Colour a_Colour );
 		Colour& operator*=( float a_Scalar );
+		constexpr operator uint32_t() const { return ( *reinterpret_cast< const uint32_t* >( this ) ) >> 8u; }
 	};
 } // namespace ConsoleGL
 

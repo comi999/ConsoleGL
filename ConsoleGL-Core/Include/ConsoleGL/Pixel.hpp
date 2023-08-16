@@ -12,8 +12,8 @@ namespace ConsoleGL
 		using UnicodeType = WCHAR;
 		using WordType = WORD;
 
-		static const size_t PixelMapLength = 256u * 256u * 256u;
-		static const int8_t PixelMap[ PixelMapLength * sizeof( BaseType ) ];
+		static const size_t PixelMapLength = 256u * 256u * 256u / sizeof( uint64_t ) * sizeof( BaseType );
+		static const uint64_t PixelMap[ PixelMapLength ];
 
 		static Pixel Empty;
 		static Pixel OneQuarter;
@@ -28,6 +28,7 @@ namespace ConsoleGL
 		Pixel& operator=( Pixel&& ) = default;
 		Pixel( BaseType a_Base ) : BaseType( a_Base ) {}
 		Pixel( EConsoleColour a_ConsoleColour ) { *this = Empty; SetBackground( a_ConsoleColour ); }
+		Pixel( Colour a_Colour ) { *this = reinterpret_cast< const Pixel* >( PixelMap )[ a_Colour.r * 256u * 256u + a_Colour.g * 256u + a_Colour.b ]; }
 		AsciiType& Ascii() { return Char.AsciiChar; }
 		UnicodeType& Unicode() { return Char.UnicodeChar; }
 		WordType& Attributes() { return CHAR_INFO::Attributes; }

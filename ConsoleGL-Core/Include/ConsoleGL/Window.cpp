@@ -1,5 +1,105 @@
 #include <ConsoleGL/Window.hpp>
 
+/*
+BLACK	        0,0,0	    12,12,12
+DARK_BLUE	    0,0,128	    0,55,218
+DARK_GREEN	    0,128,0	    19,161,14
+DARK_CYAN	    0,128,128	58,150,221
+DARK_RED	    128,0,0	    197,15,31
+DARK_MAGENTA	128,0,128	136,23,152
+DARK_YELLOW	    128,128,0	193,156,0
+DARK_WHITE	    192,192,192	204,204,204
+BRIGHT_BLACK	128,128,128	118,118,118
+BRIGHT_BLUE	    0,0,255	    59,120,255
+BRIGHT_GREEN	0,255,0	    22,198,12
+BRIGHT_CYAN	    0,255,255	97,214,214
+BRIGHT_RED	    255,0,0	231,72,86
+BRIGHT_MAGENTA	255,0,255	180,0,158
+BRIGHT_YELLOW	255,255,0	249,241,165
+WHITE	        255,255,255	242,242,242
+*/
+
+
+const ConsoleGL::Colour ColourSetDefault[ 16 ] =
+{
+    { 0,   0,   0   },
+    { 100, 88,  69  },
+    { 196, 174, 136 },
+    { 48,  42,  33  },
+    { 255, 255, 205 },
+    { 148, 131, 102 },
+    { 244, 217, 169 },
+    { 255, 255, 238 },
+    { 114, 102, 79  },
+    { 148, 131, 102 },
+    { 180, 160, 125 },
+    { 130, 116, 90  },
+    { 213, 190, 148 },
+    { 164, 146, 113 },
+    { 196, 174, 136 },
+    { 229, 204, 159 }
+};
+
+const ConsoleGL::Colour ColourSetLegacy[ 16 ] =
+{
+    { 0,   0,   0   },
+    { 100, 88,  69  },
+    { 196, 174, 136 },
+    { 48,  42,  33  },
+    { 255, 255, 205 },
+    { 148, 131, 102 },
+    { 244, 217, 169 },
+    { 255, 255, 238 },
+    { 114, 102, 79  },
+    { 148, 131, 102 },
+    { 180, 160, 125 },
+    { 130, 116, 90  },
+    { 213, 190, 148 },
+    { 164, 146, 113 },
+    { 196, 174, 136 },
+    { 229, 204, 159 }
+};
+
+const ConsoleGL::Colour ColourSetGreyscale[ 16 ] =
+{
+    { 0,   0,   0   },
+    { 100, 88,  69  },
+    { 196, 174, 136 },
+    { 48,  42,  33  },
+    { 255, 255, 205 },
+    { 148, 131, 102 },
+    { 244, 217, 169 },
+    { 255, 255, 238 },
+    { 114, 102, 79  },
+    { 148, 131, 102 },
+    { 180, 160, 125 },
+    { 130, 116, 90  },
+    { 213, 190, 148 },
+    { 164, 146, 113 },
+    { 196, 174, 136 },
+    { 229, 204, 159 }
+};
+
+const ConsoleGL::Colour ColourSetSepia[ 16 ] = 
+{
+    { 0,   0,   0   },
+    { 100, 88,  69  },
+    { 196, 174, 136 },
+    { 48,  42,  33  },
+    { 255, 255, 205 },
+    { 148, 131, 102 },
+    { 244, 217, 169 },
+    { 255, 255, 238 },
+    { 114, 102, 79  },
+    { 148, 131, 102 },
+    { 180, 160, 125 },
+    { 130, 116, 90  },
+    { 213, 190, 148 },
+    { 164, 146, 113 },
+    { 196, 174, 136 },
+    { 229, 204, 159 }
+};
+
 ConsoleGL::Window* ConsoleGL::Window::s_Active = nullptr;
 
 ConsoleGL::Window::Window()
@@ -135,7 +235,7 @@ ConsoleGL::Window* ConsoleGL::Window::Create( const std::string& a_Title, uint32
     // Set window attributes.
     SetWindowLong( NewWindow->m_WindowHandle, GWL_STYLE, WS_CAPTION | DS_MODALFRAME | WS_MINIMIZEBOX | WS_SYSMENU );
     SetWindowPos( NewWindow->m_WindowHandle, 0, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_SHOWWINDOW );
-    SetConsoleMode( NewWindow->m_ConsoleInputHandle, ENABLE_EXTENDED_FLAGS | ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT );
+    SetConsoleMode( NewWindow->m_ConsoleInputHandle, /*ENABLE_EXTENDED_FLAGS |*/ ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT );
     SetConsoleTitle( Title.c_str() );
 
     // Set up buffers.
@@ -224,9 +324,9 @@ void ConsoleGL::Window::SetColours( const ConsoleGL::Colour* a_Colours )
     for ( int i = 0; i < 16; ++i )
     {
         ScreenBufferInfo.ColorTable[ i ] =
-            static_cast< uint32_t >( a_Colours[ i ].b ) << 16 |
-            static_cast< uint32_t >( a_Colours[ i ].g ) << 8 |
-            static_cast< uint32_t >( a_Colours[ i ].r );
+            ( static_cast< uint32_t >( a_Colours[ i ].b ) << 16 ) |
+            ( static_cast< uint32_t >( a_Colours[ i ].g ) << 8  ) |
+            ( static_cast< uint32_t >( a_Colours[ i ].r ) );
     }
 
     SetConsoleScreenBufferInfoEx( OutputHandle, &ScreenBufferInfo);
