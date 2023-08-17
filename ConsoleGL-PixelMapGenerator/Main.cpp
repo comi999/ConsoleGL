@@ -1,5 +1,6 @@
 #include <fstream>
 #include <string>
+#include <iostream>
 #include <Windows.h>
 
 struct Colour { uint8_t a, r, g, b; };
@@ -9,6 +10,9 @@ class PixelMapGenerator
 public:
 
 	using PixelType = CHAR_INFO;
+
+	PixelMapGenerator() = default;
+	~PixelMapGenerator() { delete m_Data; }
 
 	void Init();
 	const PixelType* Data() const { return m_Data; }
@@ -25,7 +29,8 @@ void PixelMapGenerator::Init()
 
 	const auto PixelAt = [&]( Colour a_Colour ) -> PixelType&
 	{
-		return m_Data[ 256u * 256u * a_Colour.r + 256u * a_Colour.g + a_Colour.b ];
+		return m_Data[ ( ( uint32_t )a_Colour.r * 256u * 256u ) + ( ( uint32_t )a_Colour.g * 256u ) + a_Colour.b ];
+		//return m_Data[ *( uint32_t* )&a_Colour >> 8u ];
 	};
 
 	const auto SetFG = []( PixelType& a_Pixel, uint8_t a_Colour )
@@ -93,19 +98,20 @@ void PixelMapGenerator::Init()
 	size_t Index = 16;
 
 	// Set remaining colours.
-	for ( int i = 0; i < 15; ++i )
+	for ( uint32_t i = 0; i < 15; ++i )
 	{
 		Colour Background = Seeds[ i ];
 	
-		for ( int j = i + 1; j < 16; ++j )
+		for ( uint32_t j = i + 1; j < 16; ++j )
 		{
 			Colour Foreground = Seeds[ j ];
 	
-			for ( int k = 1; k < 4; ++k )
+			for ( uint32_t k = 1; k < 4; ++k )
 			{
 				// Get alpha.
 				// ( ( k - 1 ) * 64 + 63 ) / 255.0f;
 				float Alpha = k * 0.2509804f - 0.003921569f;
+				//float Alpha = ( float )( ( k - 1u ) * 64u + 63u ) / 255.0f;
 	
 				// Create and set Colour Seed.
 				Colour& SeedColour = Seeds[ Index++ ];
@@ -115,6 +121,9 @@ void PixelMapGenerator::Init()
 				SeedColour.r = Background.r + Alpha * ( Foreground.r - Background.r );
 				SeedColour.g = Background.g + Alpha * ( Foreground.g - Background.g );
 				SeedColour.b = Background.b + Alpha * ( Foreground.b - Background.b );
+				//SeedColour.r = ( 1.0f - Alpha ) * ( float )Background.r + Alpha * ( float )Foreground.r;
+				//SeedColour.g = ( 1.0f - Alpha ) * ( float )Background.g + Alpha * ( float )Foreground.g;
+				//SeedColour.b = ( 1.0f - Alpha ) * ( float )Background.b + Alpha * ( float )Foreground.b;
 
 				// Set pixel.
 				PixelType& Pixel = PixelAt( SeedColour );
@@ -125,14 +134,19 @@ void PixelMapGenerator::Init()
 		}
 	}
 
-	for ( uint32_t i = 0u; i < 256u * 256u * 256u; ++i )
+	for ( uint32_t r = 0u; r < 256u; ++r )
+	for ( uint32_t g = 0u; g < 256u; ++g )
+	for ( uint32_t b = 0u; b < 256u; ++b )
 	{
 		Colour c;
 		{
-			uint32_t Index = i << 8u;
-			c = *( Colour* )&Index; 
+			//uint32_t Index = i << 8u;
+			//c = *( Colour* )&Index;
+			c.r = r;
+			c.g = g;
+			c.b = b;
 		}
-		 
+		
 		uint32_t MinDistSqrd = -1;
 		PixelType Closest;
 		
@@ -165,11 +179,90 @@ void PixelMapGenerator::Init()
 	}
 }
 
+using PixelType = typename PixelMapGenerator::PixelType;
+
+const int width = 80;
+const int height = 80;
+
+void WriteOutput( const PixelType* a_Pixels, size_t a_Count )
+{
+	SMALL_RECT rect;
+	rect.Left = 0;
+	rect.Top = 0;
+	rect.Right = width - 1;
+	rect.Bottom = height - 1;
+
+	WriteConsoleOutput(
+		GetStdHandle( STD_OUTPUT_HANDLE ),
+		a_Pixels,
+		{ ( short )width, ( short )height },
+		{ 0, 0 },
+		&rect );
+}
+
+void SetupWindow()
+{
+	STARTUPINFO si;
+	ZeroMemory( &si, sizeof( si ) );
+	si.cb = sizeof( si );
+	PROCESS_INFORMATION pi;
+	ZeroMemory( &pi, sizeof( pi ) );
+
+	auto output = GetStdHandle( STD_OUTPUT_HANDLE );
+	auto input = GetStdHandle( STD_INPUT_HANDLE );
+	auto window = GetConsoleWindow();
+
+	// Set console font.
+	CONSOLE_FONT_INFOEX FontInfo;
+	FontInfo.cbSize = sizeof( FontInfo );
+	FontInfo.nFont = 0;
+	FontInfo.dwFontSize = { ( short )8, ( short )8 };
+	FontInfo.FontFamily = FF_DONTCARE;
+	FontInfo.FontWeight = FW_NORMAL;
+	wcscpy_s( FontInfo.FaceName, L"Terminal" );
+	SetCurrentConsoleFontEx( output, false, &FontInfo );
+
+	// Get screen buffer info object.
+	CONSOLE_SCREEN_BUFFER_INFOEX ScreenBufferInfo;
+	ScreenBufferInfo.cbSize = sizeof( ScreenBufferInfo );
+	GetConsoleScreenBufferInfoEx( output, &ScreenBufferInfo );
+	//// set colours here
+	SetConsoleScreenBufferInfoEx( output, &ScreenBufferInfo );
+
+	// Get largest possible window size that can fit on screen.
+	COORD LargestWindow = GetLargestConsoleWindowSize( output );
+
+	// Set window region rect.
+	SMALL_RECT rect;
+	rect.Left = 0;
+	rect.Top = 0;
+	rect.Right = width - 1;
+	rect.Bottom = height - 1;
+
+	// Set console attributes.
+	SetConsoleScreenBufferSize( output, LargestWindow );
+	SetConsoleWindowInfo( output, true, &rect );
+	GetConsoleScreenBufferInfoEx( output, &ScreenBufferInfo );
+	SetConsoleScreenBufferSize( output, { ( short )width, ( short )height } );
+
+	// Set cursor attributes.
+	CONSOLE_CURSOR_INFO CursorInfo;
+	GetConsoleCursorInfo( output, &CursorInfo );
+	CursorInfo.bVisible = false;
+	SetConsoleCursorInfo( output, &CursorInfo );
+
+	// Set window attributes.
+	SetWindowLong( window, GWL_STYLE, WS_CAPTION | DS_MODALFRAME | WS_MINIMIZEBOX | WS_SYSMENU );
+	SetWindowPos( window, 0, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_SHOWWINDOW );
+	SetConsoleMode( input, /*ENABLE_EXTENDED_FLAGS |*/ ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT );
+}
+
 int main()
 {
 #ifndef OUTPUT_PATH
 	return 1;
 #endif
+
 	PixelMapGenerator s;
 	std::ofstream Output( OUTPUT_PATH, std::ios::binary | std::ios::out );
 	
@@ -182,6 +275,28 @@ int main()
 	Generator.Init();
 	auto Data = ( const uint8_t* )Generator.Data();
 	auto Size = Generator.Size() * sizeof( PixelMapGenerator::PixelType );
+
+	SetupWindow();
+	static PixelType Buffer[ width * height ];
+
+	for ( uint32_t r = 0; r < 256u; ++r )
+	{
+		for ( uint32_t g = 0; g < 256u; ++g )
+		{
+			for ( uint32_t b = 0; b < 256u; ++b )
+			{
+				float x = ( float )b / 255.0f;
+				float y = ( float )g / 255.0f;
+				x *= ( width - 1 );
+				y *= ( height - 1 );
+				uint32_t index = y * width + x;
+				Buffer[ index ] = ( ( const PixelType* )Data )[ r * 256u * 256u + g * 256u + b ];
+			}
+		}
+
+		WriteOutput( ( const PixelType* )Buffer, Generator.Size() );
+	}
+
 
 	const auto Write = [ &Output ]( const void* a_Data, size_t a_Length )
 	{
@@ -200,9 +315,9 @@ int main()
 
 	const size_t Increment = 256u * sizeof( PixelMapGenerator::PixelType );
 
-	for ( size_t i = 0; i < Size; i += Increment, Data += Increment )
+	for ( size_t i = 0u; i < Size; i += Increment, Data += Increment )
 	{
-		Write( Data + Increment, Increment );
+		Write( Data, Increment );
 	}
 
 	Output << "};";
