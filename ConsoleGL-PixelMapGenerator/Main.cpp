@@ -29,40 +29,71 @@ struct Colour { uint8_t /*a, */r, g, b; };
 
 Colour Seeds[ 376 ] =
 {
-	//{ 0,  0,   0,   0   }, // BLACK
-	//{ 0,  0,   0,   255 }, // BLUE
-	//{ 0,  0,   255, 0   }, // GREEN
-	//{ 0,  0,   128, 128 }, // CYAN
-	//{ 0,  255, 0,   0   }, // RED
-	//{ 0,  128, 0,   128 }, // MAGENTA
-	//{ 0,  128, 128, 0   }, // YELLOW
-	//{ 0,  170, 170, 170 }, // BRIGHT_GREY
-	//{ 0,  85,  85,  85  }, // GREY
-	//{ 0,  128, 128, 255 }, // BRIGHT_BLUE
-	//{ 0,  128, 255, 128 }, // BRIGHT_GREEN
-	//{ 0,  128, 192, 192 }, // BRIGHT_CYAN
-	//{ 0,  255, 128, 128 }, // BRIGHT_RED
-	//{ 0,  192, 128, 192 }, // BRIGHT_MAGENTA
-	//{ 0,  192, 192, 128 }, // BRIGHT_YELLOW
-	//{ 0,  255, 255, 255 }, // WHITE
+	{ 0,   0,   0   }, // BLACK
+	{ 0,   0,   255 }, // BLUE
+	{ 0,   255, 0   }, // GREEN
+	{ 0,   128, 128 }, // CYAN
+	{ 255, 0,   0   }, // RED
+	{ 128, 0,   128 }, // MAGENTA
+	{ 128, 128, 0   }, // YELLOW
+	{ 170, 170, 170 }, // BRIGHT_GREY
+	{ 85,  85,  85  }, // GREY
+	{ 128, 128, 255 }, // BRIGHT_BLUE
+	{ 128, 255, 128 }, // BRIGHT_GREEN
+	{ 128, 192, 192 }, // BRIGHT_CYAN
+	{ 255, 128, 128 }, // BRIGHT_RED
+	{ 192, 128, 192 }, // BRIGHT_MAGENTA
+	{ 192, 192, 128 }, // BRIGHT_YELLOW
+	{ 255, 255, 255 }, // WHITE
 
-	/*Black         */  { 0,   0,   0   },
-	/*Dark_Blue     */  { 255, 0,   0   },
-	/*Dark_Green    */  { 0,   255, 0   },
-	/*Dark_Cyan     */  { 0,   0,   255 },
-	/*Dark_Red      */  { 255, 255, 0   },
-	/*Dark_Magenta  */  { 255, 0,   255 },
-	/*Dark_Yellow   */  { 0,   255, 255 },
-	/*Dark_White    */  { 255, 255, 255 },
-	/*Bright_Black  */  { 85,  85,  85  },
-	/*Bright_Blue   */  { 170, 85,  85  },
-	/*Bright_Green  */  { 85,  170, 85  },
-	/*Bright_Cyan   */  { 85,  85,  170 },
-	/*Bright_Red    */  { 170, 170, 85  },
-	/*Bright_Magenta*/  { 170, 85,  170 },
-	/*Bright_Yellow */  { 85,  170, 170 },
-	/*White         */  { 170, 170, 170 }
+	///*Black         */  { 0,   0,   0   },
+	///*Dark_Blue     */  { 255, 0,   0   },
+	///*Dark_Green    */  { 0,   255, 0   },
+	///*Dark_Cyan     */  { 0,   0,   255 },
+	///*Dark_Red      */  { 255, 255, 0   },
+	///*Dark_Magenta  */  { 255, 0,   255 },
+	///*Dark_Yellow   */  { 0,   255, 255 },
+	///*Dark_White    */  { 255, 255, 255 },
+	///*Bright_Black  */  { 85,  85,  85  },
+	///*Bright_Blue   */  { 170, 85,  85  },
+	///*Bright_Green  */  { 85,  170, 85  },
+	///*Bright_Cyan   */  { 85,  85,  170 },
+	///*Bright_Red    */  { 170, 170, 85  },
+	///*Bright_Magenta*/  { 170, 85,  170 },
+	///*Bright_Yellow */  { 85,  170, 170 },
+	///*White         */  { 170, 170, 170 }
 };
+
+Colour CombineColour( Colour a_LHS, Colour a_RHS, uint8_t a_Alpha )
+{
+	static const float Denom = 1.0f / 255.0f;
+
+	if ( a_Alpha == 255 )
+	{
+		return a_RHS;
+	}
+
+	if ( a_Alpha == 0 )
+	{
+		return a_LHS;
+	}
+
+	uint8_t NewA = 255 - ( 255 - a_Alpha ) * ( 1.0f - 255 * Denom );
+
+	if ( 255 < 1.0e-6f )
+	{
+		return Colour{ 255, 255, 255 };
+	}
+
+	float PremultiplyLeft = float( a_Alpha ) / NewA;
+	float PremultiplyRight = 255 * ( 1.0f - a_Alpha * Denom ) / NewA;
+
+	a_RHS.r = a_RHS.r * PremultiplyLeft + a_LHS.r * PremultiplyRight;
+	a_RHS.g = a_RHS.g * PremultiplyLeft + a_LHS.g * PremultiplyRight;
+	a_RHS.b = a_RHS.b * PremultiplyLeft + a_LHS.b * PremultiplyRight;
+
+	return a_RHS;
+}
 
 class PixelMapGenerator
 {
@@ -86,30 +117,30 @@ void PixelMapGenerator::Init()
 		return m_Data[ 
 			( uint32_t )a_Colour.b * 256u * 256u + 
 			( uint32_t )a_Colour.g * 256u + 
-			( uint32_t )a_Colour.r 
+			( uint32_t )a_Colour.r
 		];
 	};
 
-	const auto SetFG = []( PixelType& a_Pixel, uint8_t a_Colour )
+	const auto SetFG = []( PixelType& a_Pixel, uint32_t a_Colour )
 	{
-		( a_Pixel.Attributes &= 0xFFF0 ) |= static_cast< WORD >( a_Colour );
+		( a_Pixel.Attributes &= 0xFFFFFFF0 ) |= static_cast< WORD >( a_Colour );
 	};
 
-	const auto SetBG = []( PixelType& a_Pixel, uint8_t a_Colour )
+	const auto SetBG = []( PixelType& a_Pixel, uint32_t a_Colour )
 	{
-		( a_Pixel.Attributes &= 0xFF0F ) |= ( static_cast< WORD >( a_Colour ) << 4 );
+		( a_Pixel.Attributes &= 0xFFFFFF0F ) |= ( static_cast< WORD >( a_Colour ) << 4u );
 	};
 
 	// Set initial colours.
 	for ( uint32_t i = 0; i < 16; ++i )
 	{
 		PixelType& Pixel = PixelAt( Seeds[ i ] );
-		Pixel.Char.UnicodeChar = L'\x2588';
-		SetFG( Pixel, i );
+		Pixel.Char.UnicodeChar = L' ';
+		SetBG( Pixel, i );
 	}
 	
 	// Set remaining colours.
-	for ( uint32_t i = 0u, Index = 16u; i < 15u; ++i )
+	for ( uint32_t i = 0u, Index = 16u; i < 16u; ++i )
 	{
 		Colour Background = Seeds[ i ];
 	
@@ -120,20 +151,26 @@ void PixelMapGenerator::Init()
 			for ( uint32_t k = 0u; k < 3u; ++k )
 			{
 				// Get alpha.
-				float Alpha = ( float )( k * 64u + 63u ) / 255.0f;
+				//float Alpha = ( float )( k * 64u + 63u ) / 255.0f;
 				Colour& SeedColour = Seeds[ Index++ ];
 
 				// Combine.
-				SeedColour.r = ( 1.0f - Alpha ) * Background.r + Alpha * Foreground.r;
-				SeedColour.g = ( 1.0f - Alpha ) * Background.g + Alpha * Foreground.g;
-				SeedColour.b = ( 1.0f - Alpha ) * Background.b + Alpha * Foreground.b;
+				//SeedColour.r = ( 1.0f - Alpha ) * Background.r + Alpha * Foreground.r;
+				//SeedColour.g = ( 1.0f - Alpha ) * Background.g + Alpha * Foreground.g;
+				//SeedColour.b = ( 1.0f - Alpha ) * Background.b + Alpha * Foreground.b;
+
+				//SeedColour.r = Background.r + Alpha * ( Foreground.r - Background.r );
+				//SeedColour.g = Background.g + Alpha * ( Foreground.g - Background.g );
+				//SeedColour.r = Background.b + Alpha * ( Foreground.b - Background.b );
+
+				SeedColour = CombineColour( Foreground, Background, k * 64u + 63u );
 
 				// Set pixel.
 				PixelType& Pixel = PixelAt( SeedColour );
-				SetBG( Pixel, ( uint8_t )i );
-				SetFG( Pixel, ( uint8_t )j );
+				SetFG( Pixel, j );
+				SetBG( Pixel, i );
 				
-				Pixel.Char.UnicodeChar = L"▓▒░"[ k ];
+				Pixel.Char.UnicodeChar = L'\x2591' + k; // ░▒▓
 			}
 		}
 	}
@@ -143,6 +180,8 @@ void PixelMapGenerator::Init()
 		char ProgressBuffer[ 32 ];
 		sprintf_s( ProgressBuffer, "Generating: %.1f%%", ( float )b / 2.55f );
 		std::cout << ProgressBuffer << std::endl;
+
+
 		for ( uint32_t g = 0u; g < 256u; ++g )
 			for ( uint32_t r = 0u; r < 256u; ++r )
 			{
@@ -154,8 +193,6 @@ void PixelMapGenerator::Init()
 				}
 
 				uint32_t MinDistSqrd = 256u * 256u * 256u;
-				//PixelType Closest;
-
 				PixelType& Current = PixelAt( c );
 				PixelType Closest;
 
@@ -194,7 +231,8 @@ int main()
 	return 1;
 #endif
 
-	std::ofstream Output( OUTPUT_PATH, std::ios::binary | std::ios::out );
+	//std::ofstream Output( OUTPUT_PATH, std::ios::binary | std::ios::out );
+	std::ofstream Output( "pixels.map", std::ios::binary | std::ios::out );
 	
 	if ( !Output.is_open() )
 	{
@@ -206,29 +244,33 @@ int main()
 
 #define SET_WORD_TYPE( Name ) using PacketType = Name; Output << "static const "#Name" PixelMapData[ 256u * 256u * 256u / sizeof( "#Name" ) * sizeof( CHAR_INFO ) ] = {"
 
-	SET_WORD_TYPE( uint64_t );
+	//SET_WORD_TYPE( uint64_t );
 	using PixelType = typename PixelMapGenerator::PixelType;
-	const PacketType* Packets = ( const PacketType* )Generator->Data();
-	const size_t PacketsTotal = Generator->Size() * sizeof( PixelType ) / sizeof( PacketType );
-	const size_t PacketsPerLine = 256u;
-	const size_t TotalBytes = PacketsTotal * sizeof( PacketType );
+	//const PacketType* Packets = ( const PacketType* )Generator->Data();
+	//const size_t PacketsTotal = Generator->Size() * sizeof( PixelType ) / sizeof( PacketType );
+	//const size_t PacketsPerLine = 256u;
+	//const size_t TotalBytes = PacketsTotal * sizeof( PacketType );
+	//
+	//// i here is packet index.
+	//for ( size_t i = 0u; i < PacketsTotal; i += PacketsPerLine, Packets += PacketsPerLine )
+	//{
+	//	for ( size_t j = 0u; j < PacketsPerLine; ++j )
+	//	{
+	//		Output << std::to_string( Packets[ j ] ) << "u,";
+	//	}
 
-	// i here is packet index.
-	for ( size_t i = 0u; i < PacketsTotal; i += PacketsPerLine, Packets += PacketsPerLine )
-	{
-		for ( size_t j = 0u; j < PacketsPerLine; ++j )
-		{
-			Output << std::to_string( Packets[ j ] ) << "u,";
-		}
+	//	Output << "\n";
 
-		Output << "\n";
+	//	char ProgressBuffer[ 32 ];
+	//	sprintf_s( ProgressBuffer, "Writing: %.1f%%", ( float )i * 100.0f / PacketsTotal );
+	//	std::cout << ProgressBuffer << std::endl;
+	//}
 
-		char ProgressBuffer[ 32 ];
-		sprintf_s( ProgressBuffer, "Writing: %.1f%%", ( float )i * 100.0f / PacketsTotal );
-		std::cout << ProgressBuffer << std::endl;
-	}
+	//Output << "};";
 
-	Output << "};";
+	Output.write( ( const char* )Generator->Data(), Generator->Size() * sizeof( PixelType ) );
+
+
 	Output.close();
 
 	return 0;

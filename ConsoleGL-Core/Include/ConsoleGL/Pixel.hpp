@@ -29,7 +29,7 @@ namespace ConsoleGL
 		Pixel( EConsoleColour a_ConsoleColour ) { *this = Empty; SetBackground( a_ConsoleColour ); }
 		Pixel( Colour a_Colour )
 		{
-			*this = ( ( const Pixel* )PixelMap )[ 
+			*this = PixelMap[
 				( uint32_t )a_Colour.b * 256u * 256u +
 				( uint32_t )a_Colour.g * 256u + 
 				( uint32_t )a_Colour.r
@@ -38,10 +38,10 @@ namespace ConsoleGL
 		AsciiType& Ascii() { return Char.AsciiChar; }
 		UnicodeType& Unicode() { return Char.UnicodeChar; }
 		WordType& Attributes() { return CHAR_INFO::Attributes; }
-		EConsoleColour GetForeground() { return static_cast< EConsoleColour >( 0xF & CHAR_INFO::Attributes ); }
-		EConsoleColour GetBackground() { return static_cast< EConsoleColour >( ( 0xF0 & CHAR_INFO::Attributes ) >> 4 ); }
+		EConsoleColour GetForeground() { return static_cast< EConsoleColour >( 0x0F & CHAR_INFO::Attributes ); }
+		EConsoleColour GetBackground() { return static_cast< EConsoleColour >( ( 0xF0 & CHAR_INFO::Attributes ) >> 4u ); }
 		void SetForeground( EConsoleColour a_ConsoleColour ) { ( CHAR_INFO::Attributes &= 0xFFF0 ) |= static_cast< WORD >( a_ConsoleColour ); }
-		void SetBackground( EConsoleColour a_ConsoleColour ) { ( CHAR_INFO::Attributes &= 0xFF0F ) |= ( static_cast< WORD >( a_ConsoleColour ) << 4 ); }
+		void SetBackground( EConsoleColour a_ConsoleColour ) { ( CHAR_INFO::Attributes &= 0xFF0F ) |= ( static_cast< WORD >( a_ConsoleColour ) << 4u ); }
 		operator BaseType& () { return *this; }
 		operator const BaseType& () const { return *this; }
 
