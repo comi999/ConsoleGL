@@ -46,23 +46,23 @@ namespace ConsoleGL
 
 	struct Colour
 	{
-		uint8_t a, r, g, b;
+		uint8_t /*a, */r, g, b;
 
-		constexpr Colour() : r( 0u ), g( 0u ), b( 0u ), a( 255u ) {}
+		//constexpr Colour() : r( 0u ), g( 0u ), b( 0u ), a( 255u ) {}
 
-		template < typename T, typename = std::enable_if_t< std::is_arithmetic_v< T > > >
-		constexpr Colour( T a_R, T a_G, T a_B, T a_A = []() { if constexpr ( std::is_integral_v< T > ) return 255u; else return 1.0f; }( ) )
-			: r( []() { if constexpr ( std::is_integral_v< T > ) return 1u; else return 255u; }() * a_R )
-			, g( []() { if constexpr ( std::is_integral_v< T > ) return 1u; else return 255u; }() * a_G )
-			, b( []() { if constexpr ( std::is_integral_v< T > ) return 1u; else return 255u; }() * a_B )
-			, a( []() { if constexpr ( std::is_integral_v< T > ) return 1u; else return 255u; }() * a_A )
-		{}
+		//template < typename T, typename = std::enable_if_t< std::is_arithmetic_v< T > > >
+		//constexpr Colour( T a_R, T a_G, T a_B, T a_A = []() { if constexpr ( std::is_integral_v< T > ) return 255u; else return 1.0f; }( ) )
+		//	: r( []() { if constexpr ( std::is_integral_v< T > ) return 1u; else return 255u; }() * a_R )
+		//	, g( []() { if constexpr ( std::is_integral_v< T > ) return 1u; else return 255u; }() * a_G )
+		//	, b( []() { if constexpr ( std::is_integral_v< T > ) return 1u; else return 255u; }() * a_B )
+		//	, a( []() { if constexpr ( std::is_integral_v< T > ) return 1u; else return 255u; }() * a_A )
+		//{}
 
-		Colour operator*( Colour a_Colour ) const;
-		Colour operator*( float a_Scalar ) const;
-		Colour& operator*=( Colour a_Colour );
-		Colour& operator*=( float a_Scalar );
+		//Colour operator*( Colour a_Colour ) const;
+		//Colour operator*( float a_Scalar ) const;
+		//Colour& operator*=( Colour a_Colour );
+		//Colour& operator*=( float a_Scalar );
 	};
 } // namespace ConsoleGL
 
-ConsoleGL::Colour operator*( float a_Scalar, ConsoleGL::Colour a_Colour );
+//ConsoleGL::Colour operator*( float a_Scalar, ConsoleGL::Colour a_Colour );

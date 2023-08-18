@@ -239,6 +239,8 @@
     #endif
 #endif
 
+//#define STATIC_WINDOW_ONLY
+
 namespace ConsoleGL
 {
 enum class EColourSet

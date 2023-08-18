@@ -1,5 +1,6 @@
 #include <iostream>
 #include <algorithm>
+#include <fstream>
 
 #include <ConsoleGL/Window.hpp>
 #include <ConsoleGL/Colour.hpp>
@@ -16,22 +17,39 @@ INT WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine
 
 	Colour seedColours[ 16 ]
 	{
-		{ 0,   0,   0   }, //Black          
-		{ 0,   0,   128 }, //Dark_Blue     
-		{ 0,   128, 0   }, //Dark_Green  
-		{ 0,   128, 128 }, //Dark_Cyan    
-		{ 128, 0,   0   }, //Dark_Red          
-		{ 128, 0,   128 }, //Dark_Magenta   
-		{ 128, 128, 0   }, //Dark_Yellow      
-		{ 192, 192, 192 }, //Bright_Grey
-		{ 128, 128, 128 }, //Dark_Grey  
-		{ 0,  0,  255 }, //Bright_Blue   
-		{ 0,  255, 0  }, //Bright_Green    
-		{ 0,  255, 255 }, //Bright_Cyan
-		{ 255, 0,  0  }, //Bright_Red    
-		{ 255, 0,  255 }, //Bright_Magenta
-		{ 255, 255, 0  }, //Bright_Yellow 
-		{ 255, 255, 255 }, //White
+	//{ 0,   0,   0   }, // BLACK
+	//{ 0,   0,   255 }, // BLUE
+	//{ 0,   255, 0   }, // GREEN
+	//{ 0,   128, 128 }, // CYAN
+	//{ 255, 0,   0   }, // RED
+	//{ 128, 0,   128 }, // MAGENTA
+	//{ 128, 128, 0   }, // YELLOW
+	//{ 170, 170, 170 }, // BRIGHT_GREY
+	//{ 85,  85,  85  }, // GREY
+	//{ 128, 128, 255 }, // BRIGHT_BLUE
+	//{ 128, 255, 128 }, // BRIGHT_GREEN
+	//{ 128, 192, 192 }, // BRIGHT_CYAN
+	//{ 255, 128, 128 }, // BRIGHT_RED
+	//{ 192, 128, 192 }, // BRIGHT_MAGENTA
+	//{ 192, 192, 128 }, // BRIGHT_YELLOW
+	//{ 255, 255, 255 }, // WHITE
+
+		/*Black         */  { 0,   0,   0   },
+		/*Dark_Blue     */  { 255, 0,   0   },
+		/*Dark_Green    */  { 0,   255, 0   },
+		/*Dark_Cyan     */  { 0,   0,   255 },
+		/*Dark_Red      */  { 255, 255, 0   },
+		/*Dark_Magenta  */  { 255, 0,   255 },
+		/*Dark_Yellow   */  { 0,   255, 255 },
+		/*Dark_White    */  { 255, 255, 255 },
+		/*Bright_Black  */  { 85,  85,  85  },
+		/*Bright_Blue   */  { 170, 85,  85  },
+		/*Bright_Green  */  { 85,  170, 85  },
+		/*Bright_Cyan   */  { 85,  85,  170 },
+		/*Bright_Red    */  { 170, 170, 85  },
+		/*Bright_Magenta*/  { 170, 85,  170 },
+		/*Bright_Yellow */  { 85,  170, 170 },
+		/*White         */  { 170, 170, 170 }
 	};
 	//AllocConsole();
 	//freopen_s( ( FILE** )stdout, "CONOUT$", "w", stdout );
@@ -82,24 +100,37 @@ INT WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine
 	auto w = window->GetWidth();
 	auto h = window->GetHeight();
 
-	for ( uint32_t r = 0u; r < 256u; ++r )
+	const char* colour_map = "colours.map";
+
+	std::ifstream f ( colour_map, std::ios::binary | std::ios::in );
+
+	if ( !f.is_open() )
+	{
+		return false;
+	}
+
+	Pixel* pixels = new Pixel[ 16777216u ];
+
+	f.read( (char*)pixels, 16777216u * sizeof( Pixel ) );
+	f.close();
+
+	for ( uint32_t b = 0u; b < 256u; ++b )
 	{
 		auto buff = window->GetBuffer();
 
-		for ( uint32_t g = 0u; g < 256u; ++g )
+		for ( uint32_t y = 0u; y < window->GetHeight(); ++y )
 		{
-			for ( uint32_t b = 0u; b < 256u; ++b )
+			for ( uint32_t x = 0u; x < window->GetWidth(); ++x )
 			{
-				float G = ( float )g / 255.0f;
-				float B = ( float )b / 255.0f;
-				uint32_t y = G * ( float )( h - 1 );
-				uint32_t x = B * ( float )( w - 1 );
+				uint32_t g = ( float )y / ( float )( window->GetHeight() - 1u ) * 255u;
+				uint32_t r = ( float )x / ( float )( window->GetWidth() - 1 ) * 255u;
 
-				Colour c{ r, g, b, 0u };
+				Colour c{ r, g, b };
 
 				Pixel p( c );
 
-				buff[ y * w + x ] = p;
+				//Pixel p = pixels[ 256u * 256u * b + 256u * g + r ];
+				buff[ y * window->GetWidth() + x ] = p;
 			}
 		}
 
@@ -108,5 +139,7 @@ INT WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine
 	}
 
 	Window::Destroy( window );
+
+	delete[] pixels;
 	return 0;
 }
