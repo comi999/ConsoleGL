@@ -1,86 +1,66 @@
 #include <ConsoleGL/Window.hpp>
 
 /*
-BLACK	        0,0,0	    12,12,12
-DARK_BLUE	    0,0,128	    0,55,218
-DARK_GREEN	    0,128,0	    19,161,14
-DARK_CYAN	    0,128,128	58,150,221
-DARK_RED	    128,0,0	    197,15,31
-DARK_MAGENTA	128,0,128	136,23,152
-DARK_YELLOW	    128,128,0	193,156,0
-DARK_WHITE	    192,192,192	204,204,204
-BRIGHT_BLACK	128,128,128	118,118,118
-BRIGHT_BLUE	    0,0,255	    59,120,255
-BRIGHT_GREEN	0,255,0	    22,198,12
-BRIGHT_CYAN	    0,255,255	97,214,214
-BRIGHT_RED	    255,0,0	231,72,86
-BRIGHT_MAGENTA	255,0,255	180,0,158
-BRIGHT_YELLOW	255,255,0	249,241,165
-WHITE	        255,255,255	242,242,242
+BLACK	        0,0,0	    
+DARK_BLUE	    0,0,128	    
+DARK_GREEN	    0,128,0	    
+DARK_CYAN	    0,128,128	
+DARK_RED	    128,0,0	    
+DARK_MAGENTA	128,0,128	
+DARK_YELLOW	    128,128,0	
+DARK_WHITE	    192,192,192	
+BRIGHT_BLACK	128,128,128	
+BRIGHT_BLUE	    0,0,255	    
+BRIGHT_GREEN	0,255,0	    
+BRIGHT_CYAN	    0,255,255	
+BRIGHT_RED	    255,0,0	    
+BRIGHT_MAGENTA	255,0,255	
+BRIGHT_YELLOW	255,255,0	
+WHITE	        255,255,255	
 */
 
 
-const ConsoleGL::Colour ColourSetDefault[ 16 ] =
+const ConsoleGL::Colour ConsoleGL::Window::ColourSetDefault[ 16 ] =
 {
     { 0,   0,   0   },
-    { 100, 88,  69  },
-    { 196, 174, 136 },
-    { 48,  42,  33  },
-    { 255, 255, 205 },
-    { 148, 131, 102 },
-    { 244, 217, 169 },
-    { 255, 255, 238 },
-    { 114, 102, 79  },
-    { 148, 131, 102 },
-    { 180, 160, 125 },
-    { 130, 116, 90  },
-    { 213, 190, 148 },
-    { 164, 146, 113 },
-    { 196, 174, 136 },
-    { 229, 204, 159 }
+    { 255, 0,   0   },
+    { 0,   255, 0   },
+    { 0,   0,   255 },
+    { 255, 255, 0   },
+    { 255, 0,   255 },
+    { 0,   255, 255 },
+    { 255, 255, 255 },
+    { 85,  85,  85  },
+    { 170, 85,  85  },
+    { 85,  170, 85  },
+    { 85,  85,  170 },
+    { 170, 170, 85  },
+    { 170, 85,  170 },
+    { 85,  170, 170 },
+    { 170, 170, 170 }
 };
 
-const ConsoleGL::Colour ColourSetLegacy[ 16 ] =
+const ConsoleGL::Colour ConsoleGL::Window::ColourSetGreyscale[ 16 ] =
 {
     { 0,   0,   0   },
-    { 100, 88,  69  },
-    { 196, 174, 136 },
-    { 48,  42,  33  },
-    { 255, 255, 205 },
-    { 148, 131, 102 },
-    { 244, 217, 169 },
-    { 255, 255, 238 },
-    { 114, 102, 79  },
-    { 148, 131, 102 },
-    { 180, 160, 125 },
-    { 130, 116, 90  },
-    { 213, 190, 148 },
-    { 164, 146, 113 },
-    { 196, 174, 136 },
-    { 229, 204, 159 }
+    { 76,  76,  76  },
+    { 149, 149, 149 },
+    { 29,  29,  29  },
+    { 225, 225, 225 },
+    { 105, 105, 105 },
+    { 178, 178, 178 },
+    { 254, 254, 254 },
+    { 83,  83,  83  },
+    { 108, 108, 108 },
+    { 133, 133, 133 },
+    { 93,  93,  93  },
+    { 158, 158, 158 },
+    { 118, 118, 118 },
+    { 143, 143, 143 },
+    { 168, 168, 168 }
 };
 
-const ConsoleGL::Colour ColourSetGreyscale[ 16 ] =
-{
-    { 0,   0,   0   },
-    { 100, 88,  69  },
-    { 196, 174, 136 },
-    { 48,  42,  33  },
-    { 255, 255, 205 },
-    { 148, 131, 102 },
-    { 244, 217, 169 },
-    { 255, 255, 238 },
-    { 114, 102, 79  },
-    { 148, 131, 102 },
-    { 180, 160, 125 },
-    { 130, 116, 90  },
-    { 213, 190, 148 },
-    { 164, 146, 113 },
-    { 196, 174, 136 },
-    { 229, 204, 159 }
-};
-
-const ConsoleGL::Colour ColourSetSepia[ 16 ] = 
+const ConsoleGL::Colour ConsoleGL::Window::ColourSetSepia[ 16 ] =
 {
     { 0,   0,   0   },
     { 100, 88,  69  },
@@ -330,6 +310,28 @@ void ConsoleGL::Window::SetColours( const ConsoleGL::Colour* a_Colours )
     }
 
     SetConsoleScreenBufferInfoEx( OutputHandle, &ScreenBufferInfo);
+}
+
+void ConsoleGL::Window::SetColours( EColourSet a_ColourSet )
+{
+    switch ( a_ColourSet )
+    {
+    case ConsoleGL::EColourSet::DEFAULT:
+    {
+        SetColours( ColourSetDefault );
+        break;
+    }
+    case ConsoleGL::EColourSet::GREYSCALE:
+    {
+        SetColours( ColourSetGreyscale );
+        break;
+    }
+    case ConsoleGL::EColourSet::SEPIA:
+    {
+        SetColours( ColourSetSepia );
+        break;
+    }
+    }
 }
 
 void ConsoleGL::Window::SwapBuffer()
