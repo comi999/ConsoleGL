@@ -17,22 +17,22 @@ INT WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine
 
 	Colour seedColours[ 16 ]
 	{
-		/*Black         */  { 0,   0,   0   },
-		/*Dark_Blue     */  { 255, 0,   0   },
-		/*Dark_Green    */  { 0,   255, 0   },
-		/*Dark_Cyan     */  { 0,   0,   255 },
-		/*Dark_Red      */  { 255, 255, 0   },
-		/*Dark_Magenta  */  { 255, 0,   255 },
-		/*Dark_Yellow   */  { 0,   255, 255 },
-		/*Dark_White    */  { 255, 255, 255 },
-		/*Bright_Black  */  { 85,  85,  85  },
-		/*Bright_Blue   */  { 170, 85,  85  },
-		/*Bright_Green  */  { 85,  170, 85  },
-		/*Bright_Cyan   */  { 85,  85,  170 },
-		/*Bright_Red    */  { 170, 170, 85  },
-		/*Bright_Magenta*/  { 170, 85,  170 },
-		/*Bright_Yellow */  { 85,  170, 170 },
-		/*White         */  { 170, 170, 170 }
+		/*Black         */  { 0u, 0,   0,   0   },
+		/*Dark_Blue     */  { 0u, 255, 0,   0   },
+		/*Dark_Green    */  { 0u, 0,   255, 0   },
+		/*Dark_Cyan     */  { 0u, 0,   0,   255 },
+		/*Dark_Red      */  { 0u, 255, 255, 0   },
+		/*Dark_Magenta  */  { 0u, 255, 0,   255 },
+		/*Dark_Yellow   */  { 0u, 0,   255, 255 },
+		/*Dark_White    */  { 0u, 255, 255, 255 },
+		/*Bright_Black  */  { 0u, 85,  85,  85  },
+		/*Bright_Blue   */  { 0u, 170, 85,  85  },
+		/*Bright_Green  */  { 0u, 85,  170, 85  },
+		/*Bright_Cyan   */  { 0u, 85,  85,  170 },
+		/*Bright_Red    */  { 0u, 170, 170, 85  },
+		/*Bright_Magenta*/  { 0u, 170, 85,  170 },
+		/*Bright_Yellow */  { 0u, 85,  170, 170 },
+		/*White         */  { 0u, 170, 170, 170 }
 	};
 
 	Window::SetColours( seedColours );
@@ -41,7 +41,7 @@ INT WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine
 	auto h = window->GetHeight();
 
 	//const char* colour_map = "colours.map";
-	const char* colour_map = "pixels.map";
+	/*const char* colour_map = "pixels.map";
 
 	std::ifstream f ( colour_map, std::ios::binary | std::ios::in );
 
@@ -53,7 +53,7 @@ INT WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine
 	Pixel* pixels = new Pixel[ 16777216u ];
 
 	f.read( (char*)pixels, 16777216u * sizeof( Pixel ) );
-	f.close();
+	f.close();*/
 
 	for ( uint32_t b = 0u; b < 256u; ++b )
 	{
@@ -68,8 +68,8 @@ INT WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine
 
 				Colour c{ r, g, b };
 
-				//Pixel p( c );
-				Pixel p = pixels[ 256u * 256u * b + 256u * g + r ];
+				Pixel p( c );
+				//Pixel p = pixels[ 256u * 256u * b + 256u * g + r ];
 				buff[ y * window->GetWidth() + x ] = p;
 			}
 		}
@@ -80,6 +80,6 @@ INT WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine
 
 	Window::Destroy( window );
 
-	delete[] pixels;
+	//delete[] pixels;
 	return 0;
 }

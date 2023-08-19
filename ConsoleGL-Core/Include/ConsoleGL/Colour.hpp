@@ -46,7 +46,7 @@ namespace ConsoleGL
 
 	struct Colour
 	{
-		uint8_t /*a, */r, g, b;
+		uint8_t a, r, g, b;
 
 		//constexpr Colour() : r( 0u ), g( 0u ), b( 0u ), a( 255u ) {}
 

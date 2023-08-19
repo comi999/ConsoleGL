@@ -3,6 +3,10 @@
 #include <Windows.h>
 #include <ConsoleGL/Colour.hpp>
 
+#define IS_LITTLE_ENDIAN  ('ABCD'==0x41424344UL)
+#define IS_BIG_ENDIAN     ('ABCD'==0x44434241UL)
+#define IS_UNKNOWN_ENDIAN (IS_LITTLE_ENDIAN == IS_BIG_ENDIAN)
+
 namespace ConsoleGL
 {
 	struct Pixel : protected CHAR_INFO
@@ -27,13 +31,18 @@ namespace ConsoleGL
 		Pixel& operator=( Pixel&& ) = default;
 		Pixel( BaseType a_Base ) : BaseType( a_Base ) {}
 		Pixel( EConsoleColour a_ConsoleColour ) { *this = Empty; SetBackground( a_ConsoleColour ); }
-		Pixel( Colour a_Colour )
-		{
-			*this = PixelMap[
-				( uint32_t )a_Colour.b * 256u * 256u +
-				( uint32_t )a_Colour.g * 256u + 
-				( uint32_t )a_Colour.r
-			];
+		Pixel( Colour a_Colour ) {
+			////*this = PixelMap[ ( uint32_t )a_Colour.b * 256u * 256u + ( uint32_t )a_Colour.g * 256u + ( uint32_t )a_Colour.r ];
+			//uint32_t Index = *( uint32_t* )&a_Colour >> 8u;
+			//*this = PixelMap[ Index ];
+
+			if constexpr ( IS_BIG_ENDIAN )
+			{
+			}
+			else
+			{
+
+			}
 		}
 		AsciiType& Ascii() { return Char.AsciiChar; }
 		UnicodeType& Unicode() { return Char.UnicodeChar; }
@@ -50,3 +59,7 @@ namespace ConsoleGL
 		friend class ConsoleWindow;
 	};
 } // namespace ConsoleGL
+
+#undef IS_LITTLE_ENDIAN
+#undef IS_BIG_ENDIAN
+#undef IS_UNKNOWN_ENDIAN
