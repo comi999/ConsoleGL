@@ -60,7 +60,7 @@ int main( int a_ArgCount, const char** a_Args )
         NULL,
         false,
         false,
-        ( L"console_dock_command_ready_" + Title ).c_str() );
+        ( L"command_ready_" + Title ).c_str() );
 
     if ( CommandReadyEvent == NULL )
     {
@@ -71,7 +71,7 @@ int main( int a_ArgCount, const char** a_Args )
         NULL,
         false,
         false,
-        ( L"console_dock_command_complete_" + Title ).c_str() );
+        ( L"command_complete_" + Title ).c_str() );
 
     if ( CommandCompleteEvent == NULL )
     {
@@ -103,34 +103,31 @@ int main( int a_ArgCount, const char** a_Args )
         {
         case EWindowCommand::Release:
         {
+            std::cout << "Release!" << std::endl;
+            FreeConsole();
+            fclose( stdout );
             break;
         }
         case EWindowCommand::Attach:
         {
+            std::cout << "Attach!" << std::endl;
+            AttachConsole( Buffer.Value );
+            freopen_s( ( FILE** )stdout, "CONOUT$", "w", stdout );
             break;
         }
         case EWindowCommand::Exit:
         {
+            std::cout << "Exit!" << std::endl;
+            Running = false;
             break;
         }
         default:
             break;
         }
+
+        SetEvent( CommandCompleteEvent );
     }
-
-    /*auto IndefiniteWaitEvent = CreateEvent(
-        NULL,
-        false,
-        false,
-        ( L"console_dock_event_" + Title ).c_str()
-    );*/
-
-
-
     
-
-    
-
     CloseHandle( MapFileHandle );
     UnmapViewOfFile( CommandBuffer );
 

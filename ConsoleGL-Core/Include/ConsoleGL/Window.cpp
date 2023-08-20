@@ -85,6 +85,10 @@ ConsoleGL::Window* ConsoleGL::Window::s_Active = nullptr;
 ConsoleGL::Window::Window()
     : m_ConsoleOutputHandle( NULL )
     , m_ConsoleInputHandle( NULL )
+    , m_CommandReady( NULL )
+    , m_CommandComplete( NULL )
+    , m_CommandBufferHandle( NULL )
+    , m_CommandBuffer( nullptr )
     , m_WindowHandle( NULL )
     , m_WindowRegion()
     , m_StartupInfo()
@@ -119,18 +123,29 @@ ConsoleGL::Window* ConsoleGL::Window::Create( const std::string& a_Title, uint32
     NewWindow->m_Title = a_Title;
     std::wstring Title( a_Title.begin(), a_Title.end() );
 
-    auto ProcessCreationEvent = CreateEvent( NULL, false, false, ( L"console_dock_event_" + Title ).c_str() );
+    NewWindow->m_CommandBufferHandle = CreateFileMapping(
+        INVALID_HANDLE_VALUE,
+        NULL,
+        PAGE_READWRITE,
+        0,
+        sizeof( WindowCommandBuffer ),
+        ( L"command_buffer_" + Title ).c_str() );
 
-    if ( ProcessCreationEvent == NULL )
+    if ( NewWindow->m_CommandBufferHandle == NULL )
     {
         SetActive( PreWindow );
         Destroy( NewWindow );
         return nullptr;
     }
 
-    auto ProcessCompletedEvent = CreateEvent( NULL, false, false, ( L"process_completed_" + Title ).c_str() );
+    NewWindow->m_CommandBuffer = ( LPTSTR )MapViewOfFile(
+        NewWindow->m_CommandBufferHandle,
+        FILE_MAP_ALL_ACCESS,
+        0,
+        0,
+        sizeof( WindowCommandBuffer ) );
 
-    if ( ProcessCompletedEvent == NULL )
+    if ( NewWindow->m_CommandBuffer == NULL )
     {
         SetActive( PreWindow );
         Destroy( NewWindow );
@@ -149,11 +164,64 @@ ConsoleGL::Window* ConsoleGL::Window::Create( const std::string& a_Title, uint32
         &NewWindow->m_StartupInfo,
         &NewWindow->m_ProcessInfo );
 
+    auto ProcessStartedEvent = CreateEvent(
+        NULL,
+        false,
+        false,
+        ( L"process_started_" + Title ).c_str() );
+
+    if ( ProcessStartedEvent == NULL )
+    {
+        SetActive( PreWindow );
+        Destroy( NewWindow );
+        return nullptr;
+    }
+
     // Wait for process to complete creation.
-    WaitForSingleObject( ProcessCompletedEvent, -1 );
+    WaitForSingleObject( ProcessStartedEvent, -1 );
+
+    NewWindow->m_CommandReady = CreateEvent(
+        NULL,
+        false,
+        false,
+        ( L"command_ready_" + Title ).c_str() );
+
+    if ( NewWindow->m_CommandReady == NULL )
+    {
+        SetActive( PreWindow );
+        Destroy( NewWindow );
+        return nullptr;
+    }
+
+    NewWindow->m_CommandComplete = CreateEvent(
+        NULL,
+        false,
+        false,
+        ( L"command_complete_" + Title ).c_str() );
+
+    if ( NewWindow->m_CommandComplete == NULL )
+    {
+        SetActive( PreWindow );
+        Destroy( NewWindow );
+        return nullptr;
+    }
 
     // Temporarily attach new console to set it's data.
+    if ( PreWindow )
+    {
+        auto CommandBuffer = ( WindowCommandBuffer* )PreWindow->m_CommandBuffer;
+        CommandBuffer->Command = EWindowCommand::Attach;
+        CommandBuffer->Value = PreWindow->m_ConsoleProcessID;
+        SetEvent( PreWindow->m_CommandReady );
+        WaitForSingleObject( PreWindow->m_CommandComplete, -1 );
+        FreeConsole();
+    }
+
     AttachConsole( NewWindow->m_ProcessInfo.dwProcessId );
+    auto CommandBuffer = ( WindowCommandBuffer* )NewWindow->m_CommandBuffer;
+    CommandBuffer->Command = EWindowCommand::Release;
+    SetEvent( NewWindow->m_CommandReady );
+    WaitForSingleObject( NewWindow->m_CommandComplete, -1 );
     NewWindow->m_ConsoleProcessID = NewWindow->m_ProcessInfo.dwProcessId;
     NewWindow->m_ConsoleOutputHandle = GetStdHandle( STD_OUTPUT_HANDLE );
     NewWindow->m_ConsoleInputHandle = GetStdHandle( STD_INPUT_HANDLE );
@@ -227,11 +295,20 @@ ConsoleGL::Window* ConsoleGL::Window::Create( const std::string& a_Title, uint32
     }
 
     // Return the attached console to the active window.
+    CommandBuffer = ( WindowCommandBuffer* )NewWindow->m_CommandBuffer;
+    CommandBuffer->Command = EWindowCommand::Attach;
+    CommandBuffer->Value = GetCurrentProcessId();  // NewWindow->m_ConsoleProcessID;
+    SetEvent( NewWindow->m_CommandReady );
+    //WaitForSingleObject( NewWindow->m_CommandComplete, -1 );
     FreeConsole();
 
     if ( PreWindow )
     {
         AttachConsole( PreWindow->m_ConsoleProcessID );
+        CommandBuffer = ( WindowCommandBuffer* )PreWindow->m_CommandBuffer;
+        CommandBuffer->Command = EWindowCommand::Release;
+        SetEvent( PreWindow->m_CommandReady );
+        WaitForSingleObject( PreWindow->m_CommandComplete, -1 );
     }
 
     return NewWindow;
@@ -249,6 +326,9 @@ void ConsoleGL::Window::Destroy( Window* a_Window )
         SetActive( nullptr );
     }
 
+    auto CommandBuffer = ( WindowCommandBuffer* )a_Window->m_CommandBuffer;
+    CommandBuffer->Command = EWindowCommand::Exit;
+    SetEvent( a_Window->m_CommandReady );
     TerminateProcess( a_Window->m_ProcessInfo.hProcess, 0 );
     CloseHandle( a_Window->m_ProcessInfo.hThread );
     CloseHandle( a_Window->m_ProcessInfo.hProcess );
@@ -259,6 +339,12 @@ void ConsoleGL::Window::SetActive( Window* a_ConsoleWindow )
 {
     if ( s_Active )
     {
+        // Reattach the console to the window dock.
+        auto CommandBuffer = ( WindowCommandBuffer* )s_Active->m_CommandBuffer;
+        CommandBuffer->Command = EWindowCommand::Attach;
+        CommandBuffer->Value = s_Active->m_ConsoleProcessID;
+        SetEvent( s_Active->m_CommandReady );
+        WaitForSingleObject( s_Active->m_CommandComplete, -1 );
         fclose( stdout );
         FreeConsole();
     }
@@ -268,6 +354,10 @@ void ConsoleGL::Window::SetActive( Window* a_ConsoleWindow )
     if ( s_Active )
     {
         AttachConsole( s_Active->m_ConsoleProcessID );
+        auto CommandBuffer = ( WindowCommandBuffer* )s_Active->m_CommandBuffer;
+        CommandBuffer->Command = EWindowCommand::Release;
+        SetEvent( s_Active->m_CommandReady );
+        WaitForSingleObject( s_Active->m_CommandComplete, -1 );
         freopen_s( ( FILE** )stdout, "CONOUT$", "w", stdout );
     }
 }

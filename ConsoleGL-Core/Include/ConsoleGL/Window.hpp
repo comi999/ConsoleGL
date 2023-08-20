@@ -27,6 +27,19 @@ enum class EColourSet
     SEPIA,
 };
 
+enum class EWindowCommand
+{
+    Release,
+    Attach,
+    Exit
+};
+
+struct WindowCommandBuffer
+{
+    EWindowCommand Command;
+    uint32_t Value;
+};
+
 class Window
 {
 private:
@@ -80,6 +93,11 @@ private:
 
     ConsoleHandle               m_ConsoleOutputHandle;
     ConsoleHandle               m_ConsoleInputHandle;
+
+    ConsoleHandle m_CommandReady;
+    ConsoleHandle m_CommandComplete;
+    ConsoleHandle m_CommandBufferHandle;
+    void* m_CommandBuffer;
     WindowHandle                m_WindowHandle;
     WindowRegion                m_WindowRegion;
     STARTUPINFO                 m_StartupInfo;
