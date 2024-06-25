@@ -3,7 +3,8 @@
 #include <iostream>
 #include <Windows.h>
 
-struct Colour { uint8_t r, g, b, a; };
+#include <Pixel.hpp>
+#include <Colour.hpp>
 
 // unique pairs = 16 nCr 2 = 16! / (16 - 2)! / 2! = 360
 // solid colours = 16
@@ -27,7 +28,7 @@ struct Colour { uint8_t r, g, b, a; };
 // igr  = 14 // BRIGHT_YELLOW
 // ibgr = 15 // WHITE
 
-Colour Seeds[ 376 ] =
+ConsoleGL::Colour Seeds[ 376 ] =
 {
 	/*Black         */  { 0,   0,   0   },
 	/*Dark_Blue     */  { 255, 0,   0   },
@@ -47,6 +48,8 @@ Colour Seeds[ 376 ] =
 	/*White         */  { 170, 170, 170 }
 };
 
+namespace ConsoleGL
+{
 class PixelMapGenerator
 {
 public:
@@ -59,7 +62,7 @@ public:
 
 private:
 
-	PixelType m_Data[ 256u * 256u * 256u ];
+	PixelType m_Data[ 256u * 256u * 256u ] {};
 };
 
 void PixelMapGenerator::Init()
@@ -151,30 +154,27 @@ void PixelMapGenerator::Init()
 		PixelAt( c ) = Closest;
 	}
 }
+}
 
 const int width = 80;
 const int height = 80;
 
 int main()
 {
-#ifndef OUTPUT_PATH
-	return 1;
-#endif
-
-	std::ofstream Output( OUTPUT_PATH, std::ios::binary | std::ios::out );
+	std::ofstream Output( "PixelMap.inl", std::ios::binary | std::ios::out );
 	
 	if ( !Output.is_open() )
 	{
 		return 1;
 	}
 
-	PixelMapGenerator* Generator = new PixelMapGenerator;
+	ConsoleGL::PixelMapGenerator* Generator = new ConsoleGL::PixelMapGenerator;
 	Generator->Init();
 
 #define SET_WORD_TYPE( Name ) using PacketType = Name; Output << "static const "#Name" PixelMapData[ 256u * 256u * 256u / sizeof( "#Name" ) * sizeof( CHAR_INFO ) ] = {"
 
 	SET_WORD_TYPE( uint64_t );
-	using PixelType = typename PixelMapGenerator::PixelType;
+	using PixelType = typename ConsoleGL::PixelMapGenerator::PixelType;
 	const PacketType* Packets = ( const PacketType* )Generator->Data();
 	const size_t PacketsTotal = Generator->Size() * sizeof( PixelType ) / sizeof( PacketType );
 	const size_t PacketsPerLine = 256u;
