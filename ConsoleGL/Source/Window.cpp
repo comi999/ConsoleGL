@@ -1,8 +1,13 @@
 #include <chrono>
-#define UNICODE
+#include <algorithm>
+
 #include <Window.hpp>
-#include <Colour.hpp>
-#include <Pixel.hpp>
+
+// Disable dll exported functions.
+#define NOUSER
+#include <Windows.h>
+
+#define CONSOLE_DOCK_PATH "ConsoleGL-ConsoleDock.exe"
 
 /*
 BLACK	        0,0,0	    
@@ -23,8 +28,7 @@ BRIGHT_YELLOW	255,255,0
 WHITE	        255,255,255	
 */
 
-
-const ConsoleGL::WindowDock*              ConsoleGL::WindowDock::s_CurrentlyBorrowed;
+const ConsoleGL::WindowDock*        ConsoleGL::WindowDock::s_CurrentlyBorrowed;
 std::list< ConsoleGL::WindowDock >  ConsoleGL::WindowDock::s_WindowDocks;
 
 struct ConsoleGL::WindowDock::InternalInfo
@@ -95,6 +99,14 @@ const ConsoleGL::Colour ConsoleGL::Window::ColourSetSepia[ 16 ] =
     { 229, 204, 159 }
 };
 
+#if __has_include("ConsoleDock.inl") && IS_CONSOLEGL
+MESSAGE( "ConsoleDock.inl found." );
+#include <ConsoleDock.inl>
+#define CONSOLE_DOCK_FOUND
+#include <fstream>
+#include <filesystem>
+#endif
+
 ConsoleGL::WindowDock::WindowDock()
 	: m_Docked( nullptr )
 {
@@ -134,10 +146,32 @@ ConsoleGL::WindowDock::WindowDock()
     m_InternalInfo->StartupInfo.cb = sizeof( m_InternalInfo->StartupInfo );
     ZeroMemory( &m_InternalInfo->ProcessInfo, sizeof( m_InternalInfo->ProcessInfo ) );
 
+#ifdef CONSOLE_DOCK_FOUND
+    MESSAGE("Found console dock exe array." );
+    bool FailedToWriteConsoleDockExe = false;
+
+    if ( !std::filesystem::exists( "ConsoleDock.exe" ) )
+    {
+    	std::ofstream ConsoleDockExe( "ConsoleDock.exe", std::ios::binary | std::ios::out );
+
+        if ( !ConsoleDockExe.is_open() )
+	    {
+		    FailedToWriteConsoleDockExe = true;
+	    }
+        else
+        {
+	        ConsoleDockExe.write( ( const char* )ConsoleDock, sizeof( ConsoleDock ) );
+        }
+    }
+#endif
+
     // This should be replaced with a Process object.
-    if ( !CreateProcessA(
+    if (
+#ifdef CONSOLE_DOCK_FOUND
+        FailedToWriteConsoleDockExe ||
+        !CreateProcessA(
         nullptr,
-        ( "../ConsoleGL-ConsoleDock/ConsoleGL-ConsoleDock.exe " + Prefix ).data(),
+        ( "ConsoleDock.exe " + Prefix ).data(),
         nullptr,
         nullptr,
         true,
@@ -145,7 +179,11 @@ ConsoleGL::WindowDock::WindowDock()
         nullptr,
         nullptr,
         &m_InternalInfo->StartupInfo,
-        &m_InternalInfo->ProcessInfo ) )
+        &m_InternalInfo->ProcessInfo )
+#else
+        true
+#endif
+        )
     {
 	    m_CommandBuffer.Clear();
         m_CommandReady.Clear();
@@ -167,8 +205,20 @@ ConsoleGL::WindowDock::WindowDock()
     }
 }
 
+ConsoleGL::WindowDock::WindowDock( WindowDock&& a_WindowDock ) noexcept
+	: m_InternalInfo( std::move( a_WindowDock.m_InternalInfo ) )
+	, m_CommandBuffer( std::move( a_WindowDock.m_CommandBuffer ) )
+	, m_CommandReady( std::move( a_WindowDock.m_CommandReady ) )
+	, m_CommandComplete( std::move( a_WindowDock.m_CommandComplete ) )
+	, m_ProcessStarted( std::move( a_WindowDock.m_ProcessStarted ) )
+	, m_Docked( a_WindowDock.m_Docked )
+{
+	a_WindowDock.m_Docked = nullptr;
+}
+
 ConsoleGL::WindowDock::~WindowDock()
 {
+    // If this is an invalid window dock, nothing to destroy.
     if ( !IsValid() )
     {
 	    return;
@@ -180,6 +230,26 @@ ConsoleGL::WindowDock::~WindowDock()
 	m_ProcessStarted.Clear();
     ENSURE_LOG( TerminateProcess( m_InternalInfo->ProcessInfo.hProcess, 0 ), "Failed to terminate console dock process." );
     delete m_Docked;
+}
+
+ConsoleGL::WindowDock& ConsoleGL::WindowDock::operator=( WindowDock&& a_WindowDock ) noexcept
+{
+    // If this is an invalid window dock, nothing to destroy.
+    if ( !IsValid() )
+    {
+		return *this;
+    }
+
+    m_InternalInfo      = std::move( a_WindowDock.m_InternalInfo );
+	m_CommandBuffer     = std::move( a_WindowDock.m_CommandBuffer );
+	m_CommandReady      = std::move( a_WindowDock.m_CommandReady );
+	m_CommandComplete   = std::move( a_WindowDock.m_CommandComplete );
+	m_ProcessStarted    = std::move( a_WindowDock.m_ProcessStarted );
+	m_Docked            = a_WindowDock.m_Docked;
+
+    a_WindowDock.m_Docked = nullptr;
+    
+	return *this;
 }
 
 ConsoleGL::WindowDock* ConsoleGL::WindowDock::Create()
@@ -314,10 +384,7 @@ ConsoleGL::Window::Window( WindowDock& a_Dock )
 
 ConsoleGL::Window::~Window()
 {
-    for ( const Pixel* Buffer : m_Buffers )
-    {
-        delete[] Buffer;
-    }
+
 }
 
 ConsoleGL::Window* ConsoleGL::Window::Create( const std::string& a_Title, uint32_t a_Width, uint32_t a_Height, uint32_t a_PixelWidth, uint32_t a_PixelHeight, uint32_t a_BufferCount )
@@ -338,27 +405,21 @@ ConsoleGL::Window* ConsoleGL::Window::Create( const std::string& a_Title, uint32
 
     // Borrow the new docked window.
 	ENSURE_LOG( Dock->Borrow(), "Could not borrow window." );
-    //Dock->m_InternalInfo->ConsoleOutputHandle = GetStdHandle( STD_OUTPUT_HANDLE );
-    //Dock->m_InternalInfo->ConsoleInputHandle = GetStdHandle( STD_INPUT_HANDLE );
     Dock->m_InternalInfo->WindowHandle = GetConsoleWindow();
 
-    // Set window attributes.
-    SetWindowLong( Dock->m_InternalInfo->WindowHandle, GWL_STYLE, WS_CAPTION | DS_MODALFRAME | WS_MINIMIZEBOX | WS_SYSMENU );
-    SetWindowPos( Dock->m_InternalInfo->WindowHandle, 0, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_SHOWWINDOW );
-    SetConsoleMode( GetStdHandle( STD_INPUT_HANDLE ), ENABLE_EXTENDED_FLAGS | ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT );
-    SetConsoleTitleA( a_Title.c_str() );
-    NewWindow->m_Title = a_Title;
+    const HANDLE StdOutputHandle = GetStdHandle( STD_OUTPUT_HANDLE );
+    const HANDLE StdInputHandle = GetStdHandle( STD_INPUT_HANDLE );
 
     // Change console visual size to a minimum so ScreenBuffer can shrink
 	// below the actual visual size
 	SMALL_RECT WindowRect = { 0, 0, 1, 1 };
-	SetConsoleWindowInfo( GetStdHandle( STD_OUTPUT_HANDLE ), true, &WindowRect );
+	ENSURE_LOG( SetConsoleWindowInfo( StdOutputHandle, true, &WindowRect ), "Failed to set console window info." );
 
     // Set the size of the screen buffer
-	ENSURE_LOG( SetConsoleScreenBufferSize( GetStdHandle( STD_OUTPUT_HANDLE ), { ( SHORT )a_Width, ( SHORT )a_Height } ), "Failed to set console screen buffer size." );
+	ENSURE_LOG( SetConsoleScreenBufferSize( StdOutputHandle, { ( SHORT )a_Width, ( SHORT )a_Height } ), "Failed to set console screen buffer size." );
 
-	// Assign screen buffer to the console
-	ENSURE_LOG( SetConsoleActiveScreenBuffer( GetStdHandle( STD_OUTPUT_HANDLE ) ), "Failed to set console screen buffer." );
+    // Assign screen buffer to the console
+	ENSURE_LOG( SetConsoleActiveScreenBuffer( StdOutputHandle ), "Failed to set console screen buffer." );
 
     // Set console font.
     CONSOLE_FONT_INFOEX FontInfo;
@@ -369,32 +430,32 @@ ConsoleGL::Window* ConsoleGL::Window::Create( const std::string& a_Title, uint32
     FontInfo.FontFamily = FF_DONTCARE;
     FontInfo.FontWeight = FW_NORMAL;
 	wcscpy_s( FontInfo.FaceName, L"Consolas" );
-	ENSURE_LOG( SetCurrentConsoleFontEx( GetStdHandle( STD_OUTPUT_HANDLE ), false, &FontInfo ), "Failed to set console font." );
+	ENSURE_LOG( SetCurrentConsoleFontEx( StdOutputHandle, false, &FontInfo ), "Failed to set console font." );
 
-    NewWindow->m_PixelWidth = a_PixelWidth;
-    NewWindow->m_PixelHeight = a_PixelHeight;
-
-    // Get screen buffer info and check the maximum allowed window size. Return
-	// error if exceeded, so user knows their dimensions/fontsize are too large
+    // Get screen buffer info.
 	CONSOLE_SCREEN_BUFFER_INFO ScreenBufferInfo;
-	ENSURE_LOG( GetConsoleScreenBufferInfo( GetStdHandle( STD_OUTPUT_HANDLE ), &ScreenBufferInfo ), "Failed to get console screen buffer info." );
+	ENSURE_LOG( GetConsoleScreenBufferInfo( StdOutputHandle, &ScreenBufferInfo ), "Failed to get console screen buffer info." );
 	ENSURE_LOG( a_Width <= ( uint32_t )ScreenBufferInfo.dwMaximumWindowSize.X, "Failed to create console window of with width %u.", a_Width );
 	ENSURE_LOG( a_Height <= ( uint32_t )ScreenBufferInfo.dwMaximumWindowSize.Y, "Failed to create console window of with height %u.", a_Height );
 
+    // Set Physical Console Window Size
+	WindowRect = { 0, 0, ( SHORT )( a_Width - 1 ), ( SHORT )( a_Height - 1 ) };
+    Dock->m_InternalInfo->WindowRegion = WindowRect;
+	ENSURE_LOG( SetConsoleWindowInfo( StdOutputHandle, true, &WindowRect ), "Failed to set console window info." );
+    ENSURE_LOG( SetConsoleMode( StdInputHandle, ENABLE_EXTENDED_FLAGS | ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT ), "Failed to set console mode." );
+    ENSURE_LOG( SetConsoleTitleA( a_Title.c_str() ), "Failed to set console title." );
+    
+    // Set window info.
+    NewWindow->m_Title = a_Title;
+    NewWindow->m_PixelWidth = a_PixelWidth;
+    NewWindow->m_PixelHeight = a_PixelHeight;
     NewWindow->m_Width = a_Width;
     NewWindow->m_Height = a_Height;
+    NewWindow->m_Buffers.reserve( a_BufferCount );
 
-	// Set Physical Console Window Size
-	WindowRect = { 0, 0, ( SHORT )( NewWindow->m_Width - 1 ), ( SHORT )( NewWindow->m_Height - 1 ) };
-    Dock->m_InternalInfo->WindowRegion = WindowRect;
-	ENSURE_LOG( SetConsoleWindowInfo( GetStdHandle( STD_OUTPUT_HANDLE ), true, &WindowRect ), "Failed to set console window info." );
-
-    // Set up buffers.
-    NewWindow->m_Buffers.resize( a_BufferCount );
-
-    for ( auto& Buffer : NewWindow->m_Buffers )
+    for ( uint32_t i = 0; i < a_BufferCount; ++i )
     {
-        Buffer = new Pixel[ NewWindow->m_Width * NewWindow->m_Height ];
+        NewWindow->m_Buffers.emplace_back( a_Width, a_Height );
     }
 
     // Return the new console back to its dock.
@@ -421,7 +482,7 @@ void ConsoleGL::Window::Destroy( Window* a_Window )
 	    ENSURE_LOG( WindowDock::s_CurrentlyBorrowed->Return(), "Failed to return console window." );
     }
 
-    auto Iter = std::find_if( WindowDock::s_WindowDocks.begin(), WindowDock::s_WindowDocks.end(), [ a_Window ]( const WindowDock& Dock ) { return &Dock == a_Window->m_Dock; } );
+    const auto Iter = std::find_if( WindowDock::s_WindowDocks.begin(), WindowDock::s_WindowDocks.end(), [ a_Window ]( const WindowDock& Dock ) { return &Dock == a_Window->m_Dock; } );
     WindowDock::s_WindowDocks.erase( Iter );
 }
 
@@ -466,16 +527,16 @@ void ConsoleGL::Window::SetColours( const Colour* a_Colours )
         return;
     }
 
-    const HANDLE OutputHandle = GetStdHandle( STD_OUTPUT_HANDLE );
+    const HANDLE StdOutputHandle = GetStdHandle( STD_OUTPUT_HANDLE );
 
-    if ( OutputHandle == INVALID_HANDLE_VALUE )
+    if ( StdOutputHandle == INVALID_HANDLE_VALUE )
     {
         return;
     }
 
     CONSOLE_SCREEN_BUFFER_INFOEX ScreenBufferInfo;
     ScreenBufferInfo.cbSize = sizeof( ScreenBufferInfo );
-    ENSURE_LOG( GetConsoleScreenBufferInfoEx( OutputHandle, &ScreenBufferInfo ), "Failed to get console window screen buffer info." );
+    ENSURE_LOG( GetConsoleScreenBufferInfoEx( StdOutputHandle, &ScreenBufferInfo ), "Failed to get console window screen buffer info." );
 
     for ( uint8_t i = 0u; i < 16u; ++i )
     {
@@ -485,36 +546,31 @@ void ConsoleGL::Window::SetColours( const Colour* a_Colours )
             ( static_cast< DWORD >( a_Colours[ i ].r )       ) ;
     }
 
-    ENSURE_LOG( SetConsoleScreenBufferInfoEx( OutputHandle, &ScreenBufferInfo), "Failed to set console window screen buffer info." );
+    // Set the screen buffer info.
+    ENSURE_LOG( SetConsoleScreenBufferInfoEx( StdOutputHandle, &ScreenBufferInfo ), "Failed to set console window screen buffer info." );
+
+    // Due to weirdness with console windows, we need to set the rect to 1x1 and then back to full size again to get rid of scrollbars caused by the above call.
+	SMALL_RECT WindowRect = { 0, 0, 1, 1 };
+	ENSURE_LOG( SetConsoleWindowInfo( StdOutputHandle, true, &WindowRect ), "Failed to set console window info." );
+	WindowRect = { 0, 0, ( SHORT )(  WindowDock::s_CurrentlyBorrowed->m_Docked->m_Width - 1 ), ( SHORT )(  WindowDock::s_CurrentlyBorrowed->m_Docked->m_Height - 1 ) };
+	ENSURE_LOG( SetConsoleWindowInfo( StdOutputHandle, true, &WindowRect ), "Failed to set console window info." );
 }
 
 void ConsoleGL::Window::SetColours( EColourSet a_ColourSet )
 {
     switch ( a_ColourSet )
     {
-    case ConsoleGL::EColourSet::DEFAULT:
+    case EColourSet::DEFAULT:
     {
         SetColours( ColourSetDefault );
         break;
     }
-    case ConsoleGL::EColourSet::NEW:
-    {
-        TODO( "Add New colour set." );
-        SetColours( ColourSetDefault );
-        break;
-    }
-    case ConsoleGL::EColourSet::LEGACY:
-    {
-        TODO( "Add Legacy colour set." );
-        SetColours( ColourSetDefault );
-        break;
-    }
-    case ConsoleGL::EColourSet::GREYSCALE:
+    case EColourSet::GREYSCALE:
     {
         SetColours( ColourSetGreyscale );
         break;
     }
-    case ConsoleGL::EColourSet::SEPIA:
+    case EColourSet::SEPIA:
     {
         SetColours( ColourSetSepia );
         break;
@@ -545,7 +601,7 @@ void ConsoleGL::Window::SwapBuffer()
 
     WriteConsoleOutput(
         GetStdHandle( STD_OUTPUT_HANDLE ),
-        ( CHAR_INFO* )Active->m_Buffers[ IndexToDraw ],
+        ( CHAR_INFO* )Active->GetBuffer( IndexToDraw )->GetPixels(),
         { ( SHORT )Active->m_Width, ( SHORT )Active->m_Height },
         { 0, 0 },
         &WindowDock::s_CurrentlyBorrowed->m_InternalInfo->WindowRegion );
@@ -562,40 +618,333 @@ void ConsoleGL::Window::SwapBuffer( const uint32_t a_Index )
     SwapBuffer();
 }
 
-void ConsoleGL::Window::SetBuffer( const Pixel a_Pixel )
-{
-    SetPixels( 0u, m_Width * m_Height, a_Pixel );
-}
+//void ConsoleGL::PixelBuffer::SetBuffer( const Pixel a_Pixel )
+//{
+//    SetPixels( 0u, m_Width * m_Height, a_Pixel );
+//}
+//
+//void ConsoleGL::PixelBuffer::SetPixel( const uint32_t a_Index, const Pixel a_Pixel )
+//{
+//    *( m_Buffers[ m_ActiveBuffer ] + a_Index ) = a_Pixel;
+//}
+//
+//void ConsoleGL::PixelBuffer::SetPixel( const uint32_t a_X, const uint32_t a_Y, const Pixel a_Pixel )
+//{
+//    SetPixel( a_X + a_Y * m_Width, a_Pixel );
+//}
+//
+//void ConsoleGL::PixelBuffer::SetPixels( const uint32_t a_Index, const uint32_t a_Count, const Pixel a_Pixel )
+//{
+//    Pixel* Buffer = GetBuffer() + a_Index;
+//
+//    for ( uint32_t i = 0; i < a_Count; ++i )
+//    {
+//        Buffer[ i ] = a_Pixel;
+//    }
+//}
+//
+//void ConsoleGL::PixelBuffer::SetPixels( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Count, const Pixel a_Pixel )
+//{
+//    SetPixels( a_X + a_Y * m_Width, a_Count, a_Pixel );
+//}
+//
+//void ConsoleGL::PixelBuffer::DrawLine( const uint32_t a_XBegin, const uint32_t a_XEnd, const uint32_t a_YBegin, const uint32_t a_YEnd, const Pixel a_Pixel )
+//{
+//
+//}
+//
+//void ConsoleGL::PixelBuffer::DrawRect( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Width, const uint32_t a_Height, const Pixel a_Pixel )
+//{
+//    for ( uint32_t y = 0, Start = a_X + a_Y * m_Width; y < a_Height; ++y, Start += m_Width )
+//    {
+//        SetPixels( Start, a_Width, a_Pixel );
+//    }
+//}
 
-void ConsoleGL::Window::SetRect( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Width, const uint32_t a_Height, const Pixel a_Pixel )
+ConsoleGL::PixelBuffer::PixelBuffer( const uint32_t a_Width, const uint32_t a_Height )
+    : m_Pixels( a_Width * a_Height > 0u ? new Pixel[ a_Width * a_Height ] : nullptr )
+    , m_Width( a_Width )
+    , m_Height( a_Height )
+{}
+
+ConsoleGL::PixelBuffer::PixelBuffer( const PixelBuffer& a_PixelBuffer )
+    : m_Pixels( a_PixelBuffer.m_Pixels ? new Pixel[ a_PixelBuffer.m_Width * a_PixelBuffer.m_Height ] : nullptr )
+    , m_Width( a_PixelBuffer.m_Width )
+    , m_Height( a_PixelBuffer.m_Height )
 {
-    for ( uint32_t y = 0, Start = a_X + a_Y * m_Width; y < a_Height; ++y, Start += m_Width )
+    if ( m_Pixels )
     {
-        SetPixels( Start, a_Width, a_Pixel );
+        ( void )memcpy( m_Pixels, a_PixelBuffer.m_Pixels, sizeof( Pixel ) * a_PixelBuffer.m_Width * a_PixelBuffer.m_Height );
     }
 }
 
-void ConsoleGL::Window::SetPixel( const uint32_t a_Index, const Pixel a_Pixel )
+ConsoleGL::PixelBuffer::PixelBuffer( PixelBuffer&& a_PixelBuffer ) noexcept
+    : m_Pixels( a_PixelBuffer.m_Pixels )
+    , m_Width( a_PixelBuffer.m_Width )
+    , m_Height( a_PixelBuffer.m_Height )
 {
-    *( m_Buffers[ m_ActiveBuffer ] + a_Index ) = a_Pixel;
+    a_PixelBuffer.m_Pixels = nullptr;
+    a_PixelBuffer.m_Width = 0u;
+    a_PixelBuffer.m_Height = 0u;
 }
 
-void ConsoleGL::Window::SetPixel( const uint32_t a_X, const uint32_t a_Y, const Pixel a_Pixel )
+ConsoleGL::PixelBuffer& ConsoleGL::PixelBuffer::operator=( const PixelBuffer& a_PixelBuffer )
 {
-    SetPixel( a_X + a_Y * m_Width, a_Pixel );
-}
+    m_Pixels = a_PixelBuffer.m_Pixels ? new Pixel[ a_PixelBuffer.m_Width * a_PixelBuffer.m_Height ] : nullptr;
+    m_Width = a_PixelBuffer.m_Width;
+    m_Height = a_PixelBuffer.m_Height;
 
-void ConsoleGL::Window::SetPixels( const uint32_t a_Index, const uint32_t a_Count, const Pixel a_Pixel )
-{
-    Pixel* Buffer = GetBuffer() + a_Index;
-
-    for ( uint32_t i = 0; i < a_Count; ++i )
+    if ( m_Pixels )
     {
-        Buffer[ i ] = a_Pixel;
+        ( void )memcpy( m_Pixels, a_PixelBuffer.m_Pixels, sizeof( Pixel ) * a_PixelBuffer.m_Width * a_PixelBuffer.m_Height );
+    }
+
+    return *this;
+}
+
+ConsoleGL::PixelBuffer& ConsoleGL::PixelBuffer::operator=( PixelBuffer&& a_PixelBuffer ) noexcept
+{
+    m_Pixels = a_PixelBuffer.m_Pixels;
+    m_Width = a_PixelBuffer.m_Width;
+    m_Height = a_PixelBuffer.m_Height;
+    a_PixelBuffer.m_Pixels = nullptr;
+    a_PixelBuffer.m_Width = 0u;
+    a_PixelBuffer.m_Height = 0u;
+    return *this;
+}
+
+ConsoleGL::PixelBuffer::~PixelBuffer()
+{
+    if ( m_Pixels )
+    {
+        delete m_Pixels;
+        m_Pixels = nullptr;
+        m_Width = 0u;
+        m_Height = 0u;
     }
 }
 
-void ConsoleGL::Window::SetPixels( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Count, const Pixel a_Pixel )
+void ConsoleGL::PixelBuffer::SetBuffer( const FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
 {
-    SetPixels( a_X + a_Y * m_Width, a_Count, a_Pixel );
+    for ( uint32_t y = 0u; y < m_Height; ++y )
+        for ( uint32_t x = 0u; x < m_Width; ++x )
+            a_FragmentFn( x, y, a_FragmentFnPayload );
 }
+
+void ConsoleGL::PixelBuffer::DrawLine( const uint32_t a_XBegin, const uint32_t a_XEnd, const uint32_t a_YBegin, const uint32_t a_YEnd, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
+{
+	int32_t x, y;
+    int32_t dx = a_XEnd - a_XBegin;
+    int32_t dy = a_YEnd - a_YBegin;
+    int32_t dx1 = abs( dx );
+    int32_t dy1 = abs( dy );
+    int32_t px = 2 * dy1 - dx1;
+    int32_t py = 2 * dx1 - dy1;
+    int32_t xe, ye, i;
+
+	if ( dy1 <= dx1 )
+	{
+		if ( dx >= 0 )
+        { 
+            x = a_XBegin; 
+            y = a_YBegin; 
+            xe = a_XEnd; 
+        }
+		else
+		{ 
+            x = a_XEnd; 
+            y = a_YEnd; 
+            xe = a_XBegin; 
+        }
+
+        SetPixel( x, y, a_FragmentFn( x, y, a_FragmentFnPayload ) );
+		
+		for ( i = 0; x < xe; ++i )
+		{
+			x = x + 1;
+
+            if ( px < 0 )
+            {
+                px = px + 2 * dy1;
+            }
+			else
+			{
+                if ( ( dx < 0 && dy < 0 ) || ( dx > 0 && dy > 0 ) )
+                {
+                    y = y + 1; 
+                }
+                else
+                {
+                    y = y - 1;
+                }
+
+				px = px + 2 * ( dy1 - dx1 );
+			}
+
+            SetPixel( x, y, a_FragmentFn( x, y, a_FragmentFnPayload ) );
+		}
+	}
+	else
+	{
+		if ( dy >= 0 )
+		{ 
+            x = a_XBegin; 
+            y = a_YBegin; 
+            ye = a_YEnd; 
+        }
+		else
+		{ 
+            x = a_XEnd;
+            y = a_YEnd; 
+            ye = a_YBegin; 
+        }
+
+        SetPixel( x, y, a_FragmentFn( x, y, a_FragmentFnPayload ) );
+
+		for ( i = 0; y < ye; ++i )
+		{
+			y = y + 1;
+
+            if ( py <= 0 )
+            {
+                py = py + 2 * dx1;
+            }
+			else
+			{
+                if ( ( dx < 0 && dy < 0 ) || ( dx > 0 && dy > 0 ) )
+                {
+                    x = x + 1;
+                }
+                else
+                {
+                    x = x - 1;
+                }
+
+				py = py + 2 * ( dx1 - dy1 );
+			}
+			
+            SetPixel( x, y, a_FragmentFn( x, y, a_FragmentFnPayload ) );
+		}
+	}
+}
+
+void ConsoleGL::PixelBuffer::DrawHorizontalLine( const uint32_t a_XBegin, const uint32_t a_YBegin, const uint32_t a_Length, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
+{
+    for ( uint32_t y = a_YBegin; y < a_YBegin + a_Length; ++y )
+    {
+        a_FragmentFn( a_XBegin, y, a_FragmentFnPayload );
+    }
+}
+
+void ConsoleGL::PixelBuffer::DrawVerticalLine( const uint32_t a_XBegin, const uint32_t a_YBegin, const uint32_t a_Length, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
+{
+    for ( uint32_t x = a_XBegin; x < a_XBegin + a_Length; ++x )
+    {
+        a_FragmentFn( x, a_YBegin, a_FragmentFnPayload );
+    }
+}
+
+void ConsoleGL::PixelBuffer::DrawTriangle( const uint32_t a_X0, const uint32_t a_X1, const uint32_t a_X2, const uint32_t a_Y0, const uint32_t a_Y1, const uint32_t a_Y2, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
+{
+    DrawLine( a_X0, a_X1, a_Y0, a_Y1, a_FragmentFn, a_FragmentFnPayload );
+    DrawLine( a_X1, a_X2, a_Y1, a_Y2, a_FragmentFn, a_FragmentFnPayload );
+    DrawLine( a_X2, a_X0, a_Y2, a_Y0, a_FragmentFn, a_FragmentFnPayload );
+}
+
+void ConsoleGL::PixelBuffer::DrawTriangleFilled( const uint32_t a_X0, const uint32_t a_X1, const uint32_t a_X2, const uint32_t a_Y0, const uint32_t a_Y1, const uint32_t a_Y2, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
+{
+    // Using code from: https://web.archive.org/web/20050408192410/http://sw-shader.sourceforge.net/rasterizer.html
+    // All credit goes to author.
+
+    // 28.4 fixed-point coordinates
+    const int Y1 = int(16.0f * (float)a_Y0);
+    const int Y2 = int(16.0f * (float)a_Y1);
+    const int Y3 = int(16.0f * (float)a_Y2);
+    const int X1 = int(16.0f * (float)a_X0);
+    const int X2 = int(16.0f * (float)a_X1);
+    const int X3 = int(16.0f * (float)a_X2);
+
+    // Deltas
+    const int DX12 = X1 - X2;
+    const int DX23 = X2 - X3;
+    const int DX31 = X3 - X1;
+
+    const int DY12 = Y1 - Y2;
+    const int DY23 = Y2 - Y3;
+    const int DY31 = Y3 - Y1;
+
+    // Fixed-point deltas
+    const int FDX12 = DX12 << 4;
+    const int FDX23 = DX23 << 4;
+    const int FDX31 = DX31 << 4;
+
+    const int FDY12 = DY12 << 4;
+    const int FDY23 = DY23 << 4;
+    const int FDY31 = DY31 << 4;
+
+    // Bounding rectangle
+    int minx = (std::min({X1, X2, X3}) + 0xF) >> 4;
+    int maxx = (std::max({X1, X2, X3}) + 0xF) >> 4;
+    int miny = (std::min({Y1, Y2, Y3}) + 0xF) >> 4;
+    int maxy = (std::max({Y1, Y2, Y3}) + 0xF) >> 4;
+
+    //(char*&)colorBuffer += miny * stride;
+    Pixel* Buffer = m_Pixels + miny * m_Width;
+
+    // Half-edge constants
+    int C1 = DY12 * X1 - DX12 * Y1;
+    int C2 = DY23 * X2 - DX23 * Y2;
+    int C3 = DY31 * X3 - DX31 * Y3;
+
+    // Correct for fill convention
+    if(DY12 < 0 || (DY12 == 0 && DX12 > 0)) C1++;
+    if(DY23 < 0 || (DY23 == 0 && DX23 > 0)) C2++;
+    if(DY31 < 0 || (DY31 == 0 && DX31 > 0)) C3++;
+
+    int CY1 = C1 + DX12 * (miny << 4) - DY12 * (minx << 4);
+    int CY2 = C2 + DX23 * (miny << 4) - DY23 * (minx << 4);
+    int CY3 = C3 + DX31 * (miny << 4) - DY31 * (minx << 4);
+
+    for(int y = miny; y < maxy; y++)
+    {
+        int CX1 = CY1;
+        int CX2 = CY2;
+        int CX3 = CY3;
+   
+        for(int x = minx; x < maxx; x++)
+        {
+            if(CX1 > 0 && CX2 > 0 && CX3 > 0)
+            {
+                Buffer[x] = a_FragmentFn( x, y, a_FragmentFnPayload );
+            }
+
+            CX1 -= FDY12;
+            CX2 -= FDY23;
+            CX3 -= FDY31;
+        }
+
+        CY1 += FDX12;
+        CY2 += FDX23;
+        CY3 += FDX31;
+
+        //(char*&)colorBuffer += stride;
+        Buffer += m_Width;
+    }
+
+}
+
+void ConsoleGL::PixelBuffer::DrawRect( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Width, const uint32_t a_Height, FragmentFn a_FragmentFn, void* a_FragmentFnPayload ) {}
+
+void ConsoleGL::PixelBuffer::DrawRect( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Width, const uint32_t a_Height, const float a_Radians, FragmentFn a_FragmentFn, void* a_FragmentFnPayload ) {}
+
+void ConsoleGL::PixelBuffer::DrawRectFilled( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Width, const uint32_t a_Height, FragmentFn a_FragmentFn, void* a_FragmentFnPayload ) {}
+
+void ConsoleGL::PixelBuffer::DrawRectFilled( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Width, const uint32_t a_Height, const float a_Radians, FragmentFn a_FragmentFn, void* a_FragmentFnPayload ) {}
+
+void ConsoleGL::PixelBuffer::DrawCircle( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Radius, FragmentFn a_FragmentFn, void* a_FragmentFnPayload ) {}
+
+void ConsoleGL::PixelBuffer::DrawCircleFilled( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Radius, FragmentFn a_FragmentFn, void* a_FragmentFnPayload ) {}
+
+void ConsoleGL::PixelBuffer::DrawEllipse( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_RadiusMinor, const uint32_t a_RadiusMajor, FragmentFn a_FragmentFn, void* a_FragmentFnPayload ) {}
+
+void ConsoleGL::PixelBuffer::DrawEllipseFilled( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_RadiusMinor, const uint32_t a_RadiusMajor, FragmentFn a_FragmentFn, void* a_FragmentFnPayload ) {}

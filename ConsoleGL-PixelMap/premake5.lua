@@ -4,6 +4,7 @@ consolegl_source_folder = "../ConsoleGL/Source"
 consolegl_dependencies_folder = "../ConsoleGL/Dependencies"
 
 generated_folder = "../Generated"
+code_folder = "../Generated/Code"
 binaries_folder = "../Generated/Binaries"
 intermediate_folder = "../Generated/Intermediate"
 project_folder = "../Generated/Project"
@@ -12,7 +13,7 @@ consolegl_dependencies = {
 	"glm"
 }
 
-project "ConsoleGL-ConsoleDock"
+project "ConsoleGL-PixelMap"
 	location "../Generated/Project"
     kind "ConsoleApp"
     language "C++"
@@ -22,6 +23,18 @@ project "ConsoleGL-ConsoleDock"
 	dependson { "ConsoleGL" }
 	includedirs { consolegl_source_folder, "." }
 	forceincludes { path.join(consolegl_source_folder, "Common.hpp") }
+	
+    postbuildcommands {
+		"cd \"$(TargetDir)\"",
+		"ConsoleGL-PixelMap.exe",
+		"copy /Y \"$(SolutionDir)Programs\\File2Cpp.exe\" \"$(TargetDir)\"",
+		"copy /Y \"$(SolutionDir)ConsoleGL\\Templates\\PixelMap.f2c\" \"$(TargetDir)\"",
+		"mkdir \"$(SolutionDir)Generated\\Code\\%{cfg.buildcfg}\\Win64\\ConsoleGL-PixelMap\"",
+		"\"File2Cpp.exe\" \"PixelMap.f2c\" \"--output\" \"$(SolutionDir)Generated\\Code\\%{cfg.buildcfg}\\Win64\\ConsoleGL-PixelMap\\PixelMap.inl\"",
+		"del /Q File2Cpp.exe",
+		"del /Q PixelMap.f2c",
+		"del /Q PixelMap"
+    }
 	
     files {
 		path.join("**.c"),
@@ -34,21 +47,11 @@ project "ConsoleGL-ConsoleDock"
 	
 	add_dependencies(consolegl_dependencies_folder, consolegl_dependencies, true)
 	
-    postbuildcommands {
-		"copy /Y \"$(SolutionDir)Programs\\File2Cpp.exe\" \"$(TargetDir)\"",
-		"copy /Y \"$(SolutionDir)ConsoleGL\\Templates\\ConsoleDock.f2c\" \"$(TargetDir)\"",
-		"mkdir \"$(SolutionDir)Generated\\Code\\%{cfg.buildcfg}\\Win64\\ConsoleGL-ConsoleDock\"",
-		"cd \"$(TargetDir)\"",
-		"\"File2Cpp.exe\" \"ConsoleDock.f2c\" \"--output\" \"$(SolutionDir)Generated\\Code\\%{cfg.buildcfg}\\Win64\\ConsoleGL-ConsoleDock\\ConsoleDock.inl\"",
-		"del /Q File2Cpp.exe",
-		"del /Q ConsoleDock.f2c"
-    }
-	
 	defines {
 		"_CRT_SECURE_NO_WARNINGS",
 		"UNICODE",
 		"IS_EXE",
-		"IS_CONSOLE_DOCK",
+		"IS_PIXEL_MAP_GENERATOR",
 	}
 	
 	filter "configurations:Debug"

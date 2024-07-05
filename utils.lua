@@ -284,12 +284,13 @@ function create_app(name, apps_folder, consolegl_folder)
 	
 	project(name)
 	location "Generated/Project"
-	kind "ConsoleApp"
+	kind "WindowedApp"
 	language "C++"
 	cppdialect "C++20"
 	toolset "v143"
-	links { "ConsoleGL" }
-	dependson { "ConsoleGL" }
+	--links { "ConsoleGL-Static" }
+	dependson { "ConsoleGL-Static" }
+	links { "$(SolutionDir)Generated/Binaries/%{cfg.buildcfg}/Win64/ConsoleGL-Static/ConsoleGL-Static.lib" }
 	includedirs { consolegl_source_folder, app_source_folder }
 	forceincludes { path.join(consolegl_source_folder, "Common.hpp") }
 	add_dependencies(consolegl_dependencies_folder, app_dependencies, true)
@@ -304,6 +305,7 @@ function create_app(name, apps_folder, consolegl_folder)
 	}
 	
 	prebuildcommands {
+		--"if not exist \"$(SolutionDir)Generated/Binaries/%{cfg.buildcfg}/Win64/ConsoleGL-PixelMap/ConsoleGL-PixelMap.lib\" (call $(SolutionDir)Build%{cfg.buildcfg}.bat)"
 	}
 	
 	local APPLICATION_NAME = string.format("APPLICATION_NAME=\"%s\"", name)
@@ -312,6 +314,8 @@ function create_app(name, apps_folder, consolegl_folder)
 	
 	defines {
 		"_CRT_SECURE_NO_WARNINGS",
+		"UNICODE",
+		"IS_EXE",
 	}
 	
 	filter "configurations:Debug"

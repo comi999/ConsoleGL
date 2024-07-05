@@ -1,3 +1,290 @@
+#include <ConsoleGL.hpp>
+#include <Window.hpp>
+
+#pragma region Window functions
+
+ConsoleGL::Window* ConsoleGL::CreateWindow( const char* a_Title, const uint32_t a_Width, const uint32_t a_Height, const uint32_t a_PixelWidth, const uint32_t a_PixelHeight, const uint32_t a_BufferCount )
+{
+	return Window::Create( a_Title, a_Width, a_Height, a_PixelWidth, a_PixelHeight, a_BufferCount );
+}
+
+void ConsoleGL::DestroyWindow( Window* a_Window )
+{
+	return Window::Destroy( a_Window );
+}
+
+void ConsoleGL::SetActiveWindow( Window* a_Window )
+{
+	Window::SetActive( a_Window );
+}
+
+ConsoleGL::Window* ConsoleGL::GetActiveWindow()
+{
+	return Window::GetActive();
+}
+
+void ConsoleGL::SetWindowTitle( const char* a_Title )
+{
+	Window::SetTitle( a_Title );
+}
+
+void ConsoleGL::SetWindowColoursFromArray( const Colour* a_Colours )
+{
+	Window::SetColours( a_Colours );
+}
+
+void ConsoleGL::SetWindowColoursFromSet( const EColourSet a_ColourSet )
+{
+	Window::SetColours( a_ColourSet );
+}
+
+void ConsoleGL::SwapWindowBuffer()
+{
+	Window::SwapBuffer();
+}
+
+void ConsoleGL::SwapWindowBufferByIndex( uint32_t a_Index )
+{
+	Window::SwapBuffer( a_Index );
+}
+
+const char* ConsoleGL::GetWindowTitle( Window* a_Window )
+{
+	return a_Window->GetTitle().c_str();
+}
+
+uint32_t ConsoleGL::GetWindowWidth( Window* a_Window )
+{
+	return a_Window->GetWidth();
+}
+
+uint32_t ConsoleGL::GetWindowHeight( Window* a_Window )
+{
+	return a_Window->GetHeight();
+}
+
+uint32_t ConsoleGL::GetWindowBufferIndex( Window* a_Window )
+{
+	return a_Window->GetBufferIndex();
+}
+
+uint32_t ConsoleGL::GetWindowBufferCount( Window* a_Window )
+{
+	return a_Window->GetBufferCount();
+}
+
+ConsoleGL::PixelBuffer* ConsoleGL::GetWindowBuffer( Window* a_Window )
+{
+	return a_Window->GetBuffer();
+}
+
+ConsoleGL::PixelBuffer* ConsoleGL::GetWindowBufferByIndex( Window* a_Window, const uint32_t a_Index )
+{
+	return a_Window->GetBuffer( a_Index );
+}
+
+//void ConsoleGL::SetWindowBuffer( Window* a_Window, const Pixel a_Pixel )
+//{
+//	a_Window->SetBuffer( a_Pixel );
+//}
+//
+//void ConsoleGL::SetWindowPixelByIndex( Window* a_Window, const uint32_t a_Index, const Pixel a_Pixel )
+//{
+//	a_Window->SetPixel( a_Index, a_Pixel );
+//}
+//
+//void ConsoleGL::SetWindowPixelByPosition( Window* a_Window, const uint32_t a_X, const uint32_t a_Y, const Pixel a_Pixel )
+//{
+//	a_Window->SetPixel( a_X, a_Y, a_Pixel );
+//}
+//
+//void ConsoleGL::SetWindowPixelsByIndex( Window* a_Window, const uint32_t a_Index, const uint32_t a_Count, const Pixel a_Pixel )
+//{
+//	a_Window->SetPixels( a_Index, a_Count, a_Pixel );
+//}
+//
+//void ConsoleGL::SetWindowPixelsByPosition( Window* a_Window, const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Count, const Pixel a_Pixel )
+//{
+//	a_Window->SetPixels( a_X, a_Y, a_Count, a_Pixel );
+//}
+
+#pragma endregion
+
+#pragma region Pixel map functions
+
+#if __has_include("PixelMap.inl") && IS_CONSOLEGL
+
+MESSAGE("PixelMap.inl found.");
+#include <PixelMap.inl>
+const ConsoleGL::Pixel* ConsoleGL::GetPixelMap()
+{
+	return ( const Pixel* )PixelMap;
+}
+
+const ConsoleGL::Pixel* ConsoleGL::MapColourToPixel( const Colour a_Colour )
+{
+	const uint8_t R = a_Colour.r >> PIXEL_MAP_MIP_LEVEL;
+	const uint8_t G = a_Colour.g >> PIXEL_MAP_MIP_LEVEL;
+	const uint8_t B = a_Colour.b >> PIXEL_MAP_MIP_LEVEL;
+
+	return ( const Pixel* )PixelMap + ( R * PIXEL_MAP_SIZE * PIXEL_MAP_SIZE ) + ( G * PIXEL_MAP_SIZE ) + B;
+}
+
+size_t ConsoleGL::GetPixelMapSize()
+{
+	return PIXEL_MAP_VOLUME;
+}
+
+#else
+
+const ConsoleGL::Pixel* ConsoleGL::GetPixelMap()
+{
+	static const Pixel Empty;
+	return &Empty;
+}
+
+const ConsoleGL::Pixel* ConsoleGL::MapColourToPixel( const Colour a_Colour )
+{
+	return GetPixelMap();
+}
+
+size_t ConsoleGL::GetPixelMapSize()
+{
+	return 1u;
+}
+
+#endif
+
+#pragma endregion
+
+#pragma region Context functions
+
+ConsoleGL::Context* ConsoleGL::CreateContext()
+{
+	return nullptr;
+}
+
+void ConsoleGL::DestroyContext( Context* a_Context )
+{
+	
+}
+
+void ConsoleGL::SetActiveContext( Context* a_Context )
+{
+	
+}
+
+ConsoleGL::Context* ConsoleGL::GetActiveContext()
+{
+	return nullptr;
+}
+
+#pragma endregion
+
+#pragma region Basic drawing functions
+
+ConsoleGL::Pixel* ConsoleGL::GetPixelBufferPixels( PixelBuffer* a_PixelBuffer )
+{
+	return a_PixelBuffer->GetPixels();
+}
+
+void ConsoleGL::DrawTriangle( PixelBuffer* a_Buffer, uint32_t a_X0, uint32_t a_X1, uint32_t a_X2, uint32_t a_Y0, uint32_t a_Y1, uint32_t a_Y2, Pixel a_Pixel )
+{
+	return a_Buffer->DrawTriangle( a_X0, a_X1, a_X2, a_Y0, a_Y1, a_Y2, a_Pixel );
+}
+
+void ConsoleGL::DrawTriangleFilled( PixelBuffer* a_Buffer, uint32_t a_X0, uint32_t a_X1, uint32_t a_X2, uint32_t a_Y0, uint32_t a_Y1, uint32_t a_Y2, Pixel a_Pixel )
+{
+	return a_Buffer->DrawTriangleFilled( a_X0, a_X1, a_X2, a_Y0, a_Y1, a_Y2, a_Pixel );
+}
+
+//void ConsoleGL::SetWindowRect( Window* a_Window, const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Width, const uint32_t a_Height, const Pixel a_Pixel )
+//{
+//	a_Window->GetBuffer()->DrawRect( a_X, a_Y, a_Width, a_Height, a_Pixel );
+//}
+
+#pragma endregion
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ////#include "Rendering.hpp"
 //#include "ConsoleWindow.hpp"
 //#include "ConsoleGL.hpp"

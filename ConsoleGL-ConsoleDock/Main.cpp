@@ -9,7 +9,5 @@ int main( int a_ArgCount, const char** a_Args )
 		return 1;
 	}
 
-	
-
 	return ConsoleGL::WindowDock::RunListener( a_Args[ 1 ] );
 }

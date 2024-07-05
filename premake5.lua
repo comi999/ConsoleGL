@@ -24,7 +24,9 @@ workspace "ConsoleGL"
 	
 include "ConsoleGL"
 include "ConsoleGL-ConsoleDock"
-include "ConsoleGL-PixelMapGenerator"
+include "ConsoleGL-PixelMap"
+include "ConsoleGL-Static"
+include "ConsoleGL-Shared"
 
 for _, app_folder in ipairs(os.matchdirs(path.join(apps_folder, "*"))) do
 	local app_name = string.sub(app_folder, string.len(apps_folder) + 2, -1)

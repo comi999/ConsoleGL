@@ -1,3 +1,0 @@
-#if USING_RENDERING_OPENGL
-
-#endif

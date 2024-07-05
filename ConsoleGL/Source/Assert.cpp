@@ -13,7 +13,7 @@ int32_t Format( char* a_Buffer, const size_t a_BufferLength, const char* a_Forma
 int32_t Format( char* a_Buffer, const size_t a_BufferLength, const char* a_FormatString, ... )
 {
 	va_list Inputs;
-	va_start( Inputs, a_FormatString );
+	va_start( Inputs );
 	const int32_t Written = Format( a_Buffer, a_BufferLength, a_FormatString, Inputs );
 	va_end( Inputs );
 	return Written;
@@ -27,8 +27,6 @@ void Break()
 
 void Abort()
 {
-	TODO( "Need to implement some way of creating a dump file." );
-
 	abort();
 }
 
@@ -69,7 +67,7 @@ void Check_Log( const bool a_Condition, const char* a_Function, const char* a_Fi
 	if ( !a_Condition )
 	{
 		va_list Inputs;
-		va_start( Inputs, a_FormatString );
+		va_start( Inputs );
 		Message( "CHECK", a_Function, a_File, a_Line, a_FormatString, Inputs );
 		va_end( Inputs );
 	}
@@ -93,7 +91,7 @@ bool Assert_Log( const bool a_Condition, const char* a_Function, const char* a_F
     if ( !a_Condition )
     {
 		va_list Inputs;
-		va_start( Inputs, a_FormatString );
+		va_start( Inputs );
 		Message( "ASSERT", a_Function, a_File, a_Line, a_FormatString, Inputs );
 		va_end( Inputs );
     }
@@ -131,7 +129,7 @@ bool Ensure_Log( const bool a_Condition
     {
 #if CONFIG_DEBUG
 		va_list Inputs;
-		va_start( Inputs, a_FormatString );
+		va_start( Inputs );
 		Message( "ENSURE", a_Function, a_File, a_Line, a_FormatString, Inputs );
 		va_end( Inputs );
 		Break();

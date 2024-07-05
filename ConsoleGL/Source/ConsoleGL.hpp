@@ -1,3 +1,282 @@
+#pragma once
+#include <type_traits>
+
+#define PIXEL_MAP_MIN_MIP_LEVEL 0
+#define PIXEL_MAP_MAX_MIP_LEVEL 7
+
+// Defines resolution of RGB cube. n between 0 to 7 where rgb resolution is (256 >> n)
+#define PIXEL_MAP_MIP_LEVEL 4
+
+// Defines the side length in pixels of the RGB cube.
+#define PIXEL_MAP_SIZE (256 >> PIXEL_MAP_MIP_LEVEL)
+
+// Defines the volume of the RGB cube.
+#define PIXEL_MAP_VOLUME (PIXEL_MAP_SIZE * PIXEL_MAP_SIZE * PIXEL_MAP_SIZE)
+
+namespace ConsoleGL
+{
+	class Window;
+	class Context;
+	class PixelBuffer;
+
+	enum class EColourSet
+	{
+		DEFAULT,
+		GREYSCALE,
+		SEPIA,
+	};
+	
+	enum class EConsoleColour : uint8_t
+	{
+		BLACK			= 0x0000,
+		DARK_BLUE		= 0x0001,
+		DARK_GREEN		= 0x0002,
+		DARK_RED		= 0x0004,
+		DARK_GREY		= 0x0008,
+		DARK_CYAN		= DARK_BLUE		| DARK_GREEN,
+		DARK_MAGENTA	= DARK_BLUE		| DARK_RED,
+		DARK_YELLOW		= DARK_GREEN	| DARK_RED,
+		BLUE			= DARK_GREY		| DARK_BLUE,
+		GREEN			= DARK_GREY		| DARK_GREEN,
+		RED				= DARK_GREY		| DARK_RED,
+		GREY			= DARK_CYAN		| DARK_RED,
+		CYAN			= DARK_GREY		| DARK_CYAN,
+		MAGENTA			= DARK_GREY		| DARK_MAGENTA,
+		YELLOW			= DARK_GREY		| DARK_YELLOW,
+		WHITE			= BLUE			| DARK_YELLOW
+	};
+
+	constexpr EConsoleColour ConsoleColourTable[ 16 ]
+	{
+		EConsoleColour::BLACK,
+		EConsoleColour::DARK_BLUE,
+		EConsoleColour::DARK_GREEN,
+		EConsoleColour::DARK_CYAN,
+		EConsoleColour::DARK_RED,
+		EConsoleColour::DARK_MAGENTA,
+		EConsoleColour::DARK_YELLOW,
+		EConsoleColour::GREY,
+		EConsoleColour::DARK_GREY,
+		EConsoleColour::BLUE,
+		EConsoleColour::GREEN,
+		EConsoleColour::CYAN,
+		EConsoleColour::RED,
+		EConsoleColour::MAGENTA,
+		EConsoleColour::YELLOW,
+		EConsoleColour::WHITE
+	};
+
+	struct Colour
+	{
+		uint8_t r = 0u, g = 0u, b = 0u, a = 255u;
+	
+		constexpr Colour() = default;
+		constexpr Colour( const Colour& ) = default;
+		constexpr Colour( Colour&& ) noexcept = default;
+		constexpr Colour& operator=( const Colour& ) = default;
+		constexpr Colour& operator=( Colour&& ) noexcept = default;
+	
+		template < typename T, std::enable_if_t< std::is_floating_point_v< T >, int > = 0 >
+		constexpr Colour( T a_R, T a_G, T a_B, T a_A )
+			: r( static_cast< uint8_t >( 255.0f * a_R ) )
+			, g( static_cast< uint8_t >( 255.0f * a_G ) )
+			, b( static_cast< uint8_t >( 255.0f * a_B ) )
+			, a( static_cast< uint8_t >( 255.0f * a_A ) )
+		{}
+	
+		template < typename T, std::enable_if_t< std::is_floating_point_v< T >, int > = 0 >
+		constexpr Colour( T a_R, T a_G, T a_B )
+			: Colour( a_R, a_G, a_B, static_cast< T >( 1.0 ) )
+		{
+			
+		}
+	
+		template < typename T, std::enable_if_t< !std::is_floating_point_v< T >, int > = 0 >
+		constexpr Colour( T a_R, T a_G, T a_B, T a_A )
+			: r( static_cast< uint8_t >( a_R ) )
+			, g( static_cast< uint8_t >( a_G ) )
+			, b( static_cast< uint8_t >( a_B ) )
+			, a( static_cast< uint8_t >( a_A ) )
+		{}
+	
+		template < typename T, std::enable_if_t< !std::is_floating_point_v< T >, int > = 0 >
+		constexpr Colour( T a_R, T a_G, T a_B )
+			: Colour( a_R, a_G, a_B, static_cast< T >( 255u ) )
+		{}
+	
+		constexpr Colour operator+( const Colour a_Colour ) const
+		{
+			constexpr float InvAlpha = 1.0f / 255.0f;
+			const float Alpha = a * InvAlpha;
+	
+			return {
+				static_cast< uint8_t >( r * Alpha + a_Colour.r * ( 1.0f - Alpha ) ),
+				static_cast< uint8_t >( g * Alpha + a_Colour.g * ( 1.0f - Alpha ) ),
+				static_cast< uint8_t >( b * Alpha + a_Colour.b * ( 1.0f - Alpha ) ),
+				a
+			};
+		}
+	
+		Colour operator*( const float a_Scalar ) const
+		{
+			return {
+				static_cast< uint8_t >( r * a_Scalar ),
+				static_cast< uint8_t >( g * a_Scalar ),
+				static_cast< uint8_t >( b * a_Scalar ),
+				a
+			};
+		}
+	
+		Colour& operator+=( const Colour a_Colour )
+		{
+			return *this = *this + a_Colour;
+		}
+	
+		Colour& operator*=( const float a_Scalar )
+		{
+			return *this = *this * a_Scalar;
+		}
+	};
+
+	struct Pixel
+	{
+		using CharType = char16_t;
+		using AttributesType = uint16_t;
+
+		CharType		Symbol{};
+		AttributesType	Attributes{};
+
+		constexpr Pixel() = default;
+		constexpr Pixel( const Pixel& ) = default;
+		constexpr Pixel( Pixel&& ) = default;
+		constexpr Pixel( const CharType a_Symbol, const EConsoleColour a_Background, const EConsoleColour a_Foreground = EConsoleColour::BLACK ) : Symbol{ a_Symbol } { SetBackground( a_Background ); SetForeground( a_Foreground ); }
+		constexpr Pixel( const EConsoleColour a_ConsoleColour ) { SetBackground( a_ConsoleColour ); }
+		constexpr Pixel& operator=( const Pixel& ) = default;
+		constexpr Pixel& operator=( Pixel&& ) = default;
+		constexpr EConsoleColour GetForeground() const { return static_cast< EConsoleColour >( 0x0F & Attributes ); }
+		constexpr EConsoleColour GetBackground() const { return static_cast< EConsoleColour >( ( 0xF0 & Attributes ) >> 4u ); }
+		constexpr void SetForeground( const EConsoleColour a_ConsoleColour ) { ( Attributes &= 0xFFF0 ) |= static_cast< AttributesType >( a_ConsoleColour ); }
+		constexpr void SetBackground( const EConsoleColour a_ConsoleColour ) { ( Attributes &= 0xFF0F ) |= ( static_cast< AttributesType >( a_ConsoleColour ) << 4u ); }
+	};
+
+#pragma region Window functions
+
+	CONSOLEGL_API Window* CreateWindow( const char* a_Title, uint32_t a_Width, uint32_t a_Height, uint32_t a_PixelWidth, uint32_t a_PixelHeight, uint32_t a_BufferCount );
+    CONSOLEGL_API void DestroyWindow( Window* a_Window );
+    CONSOLEGL_API void SetActiveWindow( Window* a_Window );
+    CONSOLEGL_API Window* GetActiveWindow();
+    CONSOLEGL_API void SetWindowTitle( const char* a_Title ); 
+    CONSOLEGL_API void SetWindowColoursFromArray( const Colour* a_Colours );
+    CONSOLEGL_API void SetWindowColoursFromSet( EColourSet a_ColourSet );
+    CONSOLEGL_API void SwapWindowBuffer();
+    CONSOLEGL_API void SwapWindowBufferByIndex( uint32_t a_Index );
+    CONSOLEGL_API const char* GetWindowTitle( Window* a_Window );
+    CONSOLEGL_API uint32_t GetWindowWidth( Window* a_Window );
+    CONSOLEGL_API uint32_t GetWindowHeight( Window* a_Window );
+    CONSOLEGL_API uint32_t GetWindowBufferIndex( Window* a_Window );
+    CONSOLEGL_API uint32_t GetWindowBufferCount( Window* a_Window );
+    CONSOLEGL_API PixelBuffer* GetWindowBuffer( Window* a_Window );
+    CONSOLEGL_API PixelBuffer* GetWindowBufferByIndex( Window* a_Window, uint32_t a_Index );
+    //CONSOLEGL_API void SetWindowBuffer( Window* a_Window, Pixel a_Pixel );
+    //CONSOLEGL_API void SetWindowPixelByIndex( Window* a_Window, uint32_t a_Index, Pixel a_Pixel );
+    //CONSOLEGL_API void SetWindowPixelByPosition( Window* a_Window, uint32_t a_X, uint32_t a_Y, Pixel a_Pixel );
+    //CONSOLEGL_API void SetWindowPixelsByIndex( Window* a_Window, uint32_t a_Index, uint32_t a_Count, Pixel a_Pixel );
+    //CONSOLEGL_API void SetWindowPixelsByPosition( Window* a_Window, uint32_t a_X, uint32_t a_Y, uint32_t a_Count, Pixel a_Pixel );
+
+#pragma endregion
+
+#pragma region Pixel mapping functions
+
+	CONSOLEGL_API const Pixel* MapColourToPixel( Colour a_Colour );
+	CONSOLEGL_API size_t GetPixelMapSize();
+	CONSOLEGL_API const Pixel* GetPixelMap();
+#pragma endregion
+
+#pragma region Context functions
+
+	CONSOLEGL_API Context* CreateContext();
+	CONSOLEGL_API void DestroyContext( Context* a_Context );
+	CONSOLEGL_API void SetActiveContext( Context* a_Context );
+	CONSOLEGL_API Context* GetActiveContext();
+
+#pragma endregion
+
+#pragma region PixelBuffer functions
+
+	CONSOLEGL_API Pixel* GetPixelBufferPixels( PixelBuffer* a_PixelBuffer );
+
+#pragma endregion
+
+#pragma region Basic drawing functions
+
+    CONSOLEGL_API void SetWindowRect( Window* a_Window, uint32_t a_X, uint32_t a_Y, uint32_t a_Width, uint32_t a_Height, Pixel a_Pixel );
+    CONSOLEGL_API void DrawTriangle( PixelBuffer* a_Buffer, uint32_t a_X0, uint32_t a_X1, uint32_t a_X2, uint32_t a_Y0, uint32_t a_Y1, uint32_t a_Y2, Pixel a_Pixel );
+    CONSOLEGL_API void DrawTriangleFilled( PixelBuffer* a_Buffer, uint32_t a_X0, uint32_t a_X1, uint32_t a_X2, uint32_t a_Y0, uint32_t a_Y1, uint32_t a_Y2, Pixel a_Pixel );
+
+#pragma endregion
+
+#pragma region Rendering functions
+
+
+
+#pragma endregion
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 //#pragma once
 //#include <stdint.h>
 //#include <array>

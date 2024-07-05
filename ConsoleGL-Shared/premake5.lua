@@ -4,6 +4,7 @@ consolegl_source_folder = "../ConsoleGL/Source"
 consolegl_dependencies_folder = "../ConsoleGL/Dependencies"
 
 generated_folder = "../Generated"
+code_folder = "../Generated/Code"
 binaries_folder = "../Generated/Binaries"
 intermediate_folder = "../Generated/Intermediate"
 project_folder = "../Generated/Project"
@@ -12,16 +13,18 @@ consolegl_dependencies = {
 	"glm"
 }
 
-project "ConsoleGL-ConsoleDock"
+project "ConsoleGL-Shared"
 	location "../Generated/Project"
-    kind "ConsoleApp"
+    kind "SharedLib"
     language "C++"
 	cppdialect "C++20"
 	
 	links { "ConsoleGL" }
-	dependson { "ConsoleGL" }
+	dependson { "ConsoleGL", "ConsoleGL-PixelMapGenerator" }
 	includedirs { consolegl_source_folder, "." }
 	forceincludes { path.join(consolegl_source_folder, "Common.hpp") }
+	add_dependencies(consolegl_dependencies_folder, consolegl_dependencies, true)
+	includedirs { "%{code_folder}/%{cfg.buildcfg}/Win64/ConsoleGL-PixelMapGenerator" }
 	
     files {
 		path.join("**.c"),
@@ -32,36 +35,20 @@ project "ConsoleGL-ConsoleDock"
 		path.join("**.natvis"),
 	}
 	
-	add_dependencies(consolegl_dependencies_folder, consolegl_dependencies, true)
-	
-    postbuildcommands {
-		"copy /Y \"$(SolutionDir)Programs\\File2Cpp.exe\" \"$(TargetDir)\"",
-		"copy /Y \"$(SolutionDir)ConsoleGL\\Templates\\ConsoleDock.f2c\" \"$(TargetDir)\"",
-		"mkdir \"$(SolutionDir)Generated\\Code\\%{cfg.buildcfg}\\Win64\\ConsoleGL-ConsoleDock\"",
-		"cd \"$(TargetDir)\"",
-		"\"File2Cpp.exe\" \"ConsoleDock.f2c\" \"--output\" \"$(SolutionDir)Generated\\Code\\%{cfg.buildcfg}\\Win64\\ConsoleGL-ConsoleDock\\ConsoleDock.inl\"",
-		"del /Q File2Cpp.exe",
-		"del /Q ConsoleDock.f2c"
-    }
-	
 	defines {
 		"_CRT_SECURE_NO_WARNINGS",
 		"UNICODE",
-		"IS_EXE",
-		"IS_CONSOLE_DOCK",
+		"IS_SHARED_LIB",
+		"IS_CONSOLEGL",
 	}
 	
 	filter "configurations:Debug"
+		defines { "CONFIG_DEBUG" }
 		symbols "On"
-		defines {
-			"CONFIG_DEBUG",
-		}
 	
 	filter "configurations:Release"
+		defines { "CONFIG_RELEASE" }
 		optimize "On"
-		defines {
-			"CONFIG_RELEASE",
-		}
 	
 	filter "platforms:Win64"
 		architecture "x86_64"

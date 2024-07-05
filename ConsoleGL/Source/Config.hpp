@@ -33,14 +33,37 @@
 #endif
 
 //==========================================================================
+// Application specifiers.
+//==========================================================================
+#ifndef IS_CONSOLEGL
+	#define IS_CONSOLEGL 0
+#endif
+
+#ifndef IS_CONSOLE_DOCK
+	#define IS_CONSOLE_DOCK 0
+#endif
+
+#ifndef IS_PIXEL_MAP_GENERATOR
+	#define IS_PIXEL_MAP_GENERATOR 0
+#endif
+
+//==========================================================================
 // Output decorators.
 //==========================================================================
-#if IS_SHARED_LIB
-	#ifdef __GNUC__
-		#define CONSOLEGL_API extern "C" __attribute__((dllexport))
-	#else
-		#define CONSOLEGL_API extern "C" __declspec(dllexport)
-	#endif
+#ifdef __GNUC__
+	#define CONSOLEGL_API_EXPORT extern "C" __attribute__((dllexport))
+	#define CONSOLEGL_API_IMPORT extern "C" __attribute__((dllimport))
+#else
+	#define CONSOLEGL_API_EXPORT extern "C" __declspec(dllexport)
+	#define CONSOLEGL_API_IMPORT extern "C" __declspec(dllimport)
+#endif
+
+#if IS_STATIC_LIB && IS_CONSOLEGL
+	#define CONSOLEGL_API
+#elif IS_SHARED_LIB && IS_CONSOLEGL
+	#define CONSOLEGL_API CONSOLEGL_API_EXPORT
+#elif defined CONSOLEGL_DLL_IMPORT
+	#define CONSOLEGL_API CONSOLEGL_API_IMPORT
 #else
 	#define CONSOLEGL_API
 #endif
