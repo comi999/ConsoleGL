@@ -99,10 +99,8 @@ const ConsoleGL::Colour ConsoleGL::Window::ColourSetSepia[ 16 ] =
     { 229, 204, 159 }
 };
 
-#if __has_include("ConsoleDock.inl") && IS_CONSOLEGL
-MESSAGE( "ConsoleDock.inl found." );
+#if IS_CONSOLEGL
 #include <ConsoleDock.inl>
-#define CONSOLE_DOCK_FOUND
 #include <fstream>
 #include <filesystem>
 #endif
@@ -146,7 +144,7 @@ ConsoleGL::WindowDock::WindowDock()
     m_InternalInfo->StartupInfo.cb = sizeof( m_InternalInfo->StartupInfo );
     ZeroMemory( &m_InternalInfo->ProcessInfo, sizeof( m_InternalInfo->ProcessInfo ) );
 
-#ifdef CONSOLE_DOCK_FOUND
+#if IS_CONSOLEGL
     MESSAGE("Found console dock exe array." );
     bool FailedToWriteConsoleDockExe = false;
 
@@ -167,7 +165,7 @@ ConsoleGL::WindowDock::WindowDock()
 
     // This should be replaced with a Process object.
     if (
-#ifdef CONSOLE_DOCK_FOUND
+#if IS_CONSOLEGL
         FailedToWriteConsoleDockExe ||
         !CreateProcessA(
         nullptr,
@@ -933,11 +931,56 @@ void ConsoleGL::PixelBuffer::DrawTriangleFilled( const uint32_t a_X0, const uint
 
 }
 
-void ConsoleGL::PixelBuffer::DrawRect( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Width, const uint32_t a_Height, FragmentFn a_FragmentFn, void* a_FragmentFnPayload ) {}
+void ConsoleGL::PixelBuffer::DrawRect( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Width, const uint32_t a_Height, FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
+{
+    // If 0 thickness, nothing to draw.
+    if ( !a_Width || !a_Height )
+    {
+	    return;
+    }
+
+    // If 1 thickness in x direction, draw horizontal line.
+    if ( a_Width == 1u )
+        return DrawVerticalLine( a_X, a_Y, a_Height, a_FragmentFn, a_FragmentFnPayload );
+
+    if ( a_Height == 1u )
+        return DrawHorizontalLine( a_X, a_Y, a_Width, a_FragmentFn, a_FragmentFnPayload );
+
+	Pixel* Top = m_Pixels + a_Y * m_Width;
+	Pixel* Bot = Top + ( a_Height - 1u ) * m_Width;
+
+    const uint32_t YTop = a_Y;
+    const uint32_t YBottom = a_Y + a_Height - 1u;
+    const uint32_t XLeft = a_X;
+    const uint32_t XRight = a_X + a_Width - 1u;
+
+    // Draw top and bottom line.
+    for ( uint32_t x = a_X; x < a_X + a_Width; ++x )
+    {
+	    Top[ x ] = a_FragmentFn( x, YTop, a_FragmentFnPayload );
+	    Bot[ x ] = a_FragmentFn( x, YBottom, a_FragmentFnPayload );
+    }
+
+    Pixel* Buffer = Top += m_Width;
+
+    // Draw left and right line.
+    for ( uint32_t y = YTop + 1u; y < YBottom; ++y, Buffer += m_Width )
+    {
+	    Buffer[ XLeft ] = a_FragmentFn( XLeft, y, a_FragmentFnPayload );
+	    Buffer[ XRight ] = a_FragmentFn( XRight, y, a_FragmentFnPayload );
+    }
+}
 
 void ConsoleGL::PixelBuffer::DrawRect( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Width, const uint32_t a_Height, const float a_Radians, FragmentFn a_FragmentFn, void* a_FragmentFnPayload ) {}
 
-void ConsoleGL::PixelBuffer::DrawRectFilled( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Width, const uint32_t a_Height, FragmentFn a_FragmentFn, void* a_FragmentFnPayload ) {}
+void ConsoleGL::PixelBuffer::DrawRectFilled( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Width, const uint32_t a_Height, FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
+{
+	Pixel* Buffer = m_Pixels + a_Y * m_Width;
+
+    for ( uint32_t y = a_Y; y < a_Y + m_Height; ++y, Buffer += m_Width )
+		for ( uint32_t x = a_X; x < a_X + m_Width; ++x )
+            Buffer[ x ] = a_FragmentFn( x, y, a_FragmentFnPayload );
+}
 
 void ConsoleGL::PixelBuffer::DrawRectFilled( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Width, const uint32_t a_Height, const float a_Radians, FragmentFn a_FragmentFn, void* a_FragmentFnPayload ) {}
 

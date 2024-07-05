@@ -12,7 +12,7 @@ workspace "ConsoleGL"
 	location "."
     configurations { "Debug", "Release" }
     platforms { "Win64" }
-	startproject "Template"
+	startproject "Example"
 	debugdir("$(OutDir)")
 	targetdir("$(SolutionDir)Generated/Binaries/%{cfg.buildcfg}/%{cfg.platform}/%{prj.name}")
 	objdir("$(SolutionDir)Generated/Intermediate/%{cfg.buildcfg}/%{cfg.platform}/%{prj.name}")

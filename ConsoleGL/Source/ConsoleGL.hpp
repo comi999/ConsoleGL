@@ -212,6 +212,7 @@ namespace ConsoleGL
     CONSOLEGL_API void SetWindowRect( Window* a_Window, uint32_t a_X, uint32_t a_Y, uint32_t a_Width, uint32_t a_Height, Pixel a_Pixel );
     CONSOLEGL_API void DrawTriangle( PixelBuffer* a_Buffer, uint32_t a_X0, uint32_t a_X1, uint32_t a_X2, uint32_t a_Y0, uint32_t a_Y1, uint32_t a_Y2, Pixel a_Pixel );
     CONSOLEGL_API void DrawTriangleFilled( PixelBuffer* a_Buffer, uint32_t a_X0, uint32_t a_X1, uint32_t a_X2, uint32_t a_Y0, uint32_t a_Y1, uint32_t a_Y2, Pixel a_Pixel );
+	CONSOLEGL_API void DrawRect( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Width, uint32_t a_Height, Pixel a_Pixel );
 
 #pragma endregion
 

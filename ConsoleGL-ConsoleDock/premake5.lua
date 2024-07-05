@@ -35,7 +35,7 @@ project "ConsoleGL-ConsoleDock"
 	add_dependencies(consolegl_dependencies_folder, consolegl_dependencies, true)
 	
     postbuildcommands {
-		"copy /Y \"$(SolutionDir)Programs\\File2Cpp.exe\" \"$(TargetDir)\"",
+		"copy /Y \"$(SolutionDir)ThirdParty\\File2Cpp\\File2Cpp.exe\" \"$(TargetDir)\"",
 		"copy /Y \"$(SolutionDir)ConsoleGL\\Templates\\ConsoleDock.f2c\" \"$(TargetDir)\"",
 		"mkdir \"$(SolutionDir)Generated\\Code\\%{cfg.buildcfg}\\Win64\\ConsoleGL-ConsoleDock\"",
 		"cd \"$(TargetDir)\"",

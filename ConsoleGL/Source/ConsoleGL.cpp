@@ -112,7 +112,7 @@ ConsoleGL::PixelBuffer* ConsoleGL::GetWindowBufferByIndex( Window* a_Window, con
 
 #pragma region Pixel map functions
 
-#if __has_include("PixelMap.inl") && IS_CONSOLEGL
+#if IS_CONSOLEGL
 
 MESSAGE("PixelMap.inl found.");
 #include <PixelMap.inl>
@@ -196,6 +196,11 @@ void ConsoleGL::DrawTriangle( PixelBuffer* a_Buffer, uint32_t a_X0, uint32_t a_X
 void ConsoleGL::DrawTriangleFilled( PixelBuffer* a_Buffer, uint32_t a_X0, uint32_t a_X1, uint32_t a_X2, uint32_t a_Y0, uint32_t a_Y1, uint32_t a_Y2, Pixel a_Pixel )
 {
 	return a_Buffer->DrawTriangleFilled( a_X0, a_X1, a_X2, a_Y0, a_Y1, a_Y2, a_Pixel );
+}
+
+void ConsoleGL::DrawRect( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Width, uint32_t a_Height, Pixel a_Pixel )
+{
+	a_Buffer->DrawRect( a_X, a_Y, a_Width, a_Height, a_Pixel );
 }
 
 //void ConsoleGL::SetWindowRect( Window* a_Window, const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Width, const uint32_t a_Height, const Pixel a_Pixel )

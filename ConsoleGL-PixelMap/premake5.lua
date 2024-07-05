@@ -27,7 +27,7 @@ project "ConsoleGL-PixelMap"
     postbuildcommands {
 		"cd \"$(TargetDir)\"",
 		"ConsoleGL-PixelMap.exe",
-		"copy /Y \"$(SolutionDir)Programs\\File2Cpp.exe\" \"$(TargetDir)\"",
+		"copy /Y \"$(SolutionDir)ThirdParty\\File2Cpp\\File2Cpp.exe\" \"$(TargetDir)\"",
 		"copy /Y \"$(SolutionDir)ConsoleGL\\Templates\\PixelMap.f2c\" \"$(TargetDir)\"",
 		"mkdir \"$(SolutionDir)Generated\\Code\\%{cfg.buildcfg}\\Win64\\ConsoleGL-PixelMap\"",
 		"\"File2Cpp.exe\" \"PixelMap.f2c\" \"--output\" \"$(SolutionDir)Generated\\Code\\%{cfg.buildcfg}\\Win64\\ConsoleGL-PixelMap\\PixelMap.inl\"",
