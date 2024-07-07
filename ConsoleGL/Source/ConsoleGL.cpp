@@ -181,11 +181,90 @@ ConsoleGL::Context* ConsoleGL::GetActiveContext()
 
 #pragma endregion
 
+#pragma region PixelBuffer functions
+
+ConsoleGL::Pixel* ConsoleGL::GetPixelBufferPixels( PixelBuffer* a_Buffer )
+{
+	return a_Buffer->GetPixels();
+}
+
+uint32_t ConsoleGL::GetPixelBufferSize( PixelBuffer* a_Buffer )
+{
+	return a_Buffer->GetSize();
+}
+
+uint32_t ConsoleGL::GetPixelBufferWidth( PixelBuffer* a_Buffer )
+{
+	return a_Buffer->GetWidth();
+}
+
+uint32_t ConsoleGL::GetPixelBufferHeight( PixelBuffer* a_Buffer )
+{
+	return a_Buffer->GetHeight();
+}
+
+#pragma endregion
+
 #pragma region Basic drawing functions
 
-ConsoleGL::Pixel* ConsoleGL::GetPixelBufferPixels( PixelBuffer* a_PixelBuffer )
+void ConsoleGL::SetPixel( PixelBuffer* a_Buffer, uint32_t a_Index, Pixel a_Pixel )
 {
-	return a_PixelBuffer->GetPixels();
+	a_Buffer->SetPixel( a_Index, a_Pixel );
+}
+
+void ConsoleGL::SetPixelByPosition( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, Pixel a_Pixel )
+{
+	a_Buffer->SetPixel( a_X, a_Y, a_Pixel );
+}
+
+void ConsoleGL::SetPixels( PixelBuffer* a_Buffer, uint32_t a_Index, uint32_t a_Count, Pixel a_Pixel )
+{
+	a_Buffer->SetPixels( a_Index, a_Count, a_Pixel );
+}
+
+void ConsoleGL::SetPixelsByPosition( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Count, Pixel a_Pixel )
+{
+	a_Buffer->SetPixels( a_X, a_Y, a_Count, a_Pixel );
+}
+
+void ConsoleGL::SetBuffer( PixelBuffer* a_Buffer, Pixel a_Pixel )
+{
+	a_Buffer->SetBuffer( a_Pixel );
+}
+
+void ConsoleGL::SetBufferFn( PixelBuffer* a_Buffer, FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
+{
+	a_Buffer->SetBuffer( a_FragmentFn, a_FragmentFnPayload );
+}
+
+void ConsoleGL::DrawLine( PixelBuffer* a_Buffer, uint32_t a_XBegin, uint32_t a_XEnd, uint32_t a_YBegin, uint32_t a_YEnd, Pixel a_Pixel )
+{
+	a_Buffer->DrawLine( a_XBegin, a_XEnd, a_YBegin, a_YEnd, a_Pixel );
+}
+
+void ConsoleGL::DrawLineFn( PixelBuffer* a_Buffer, uint32_t a_XBegin, uint32_t a_XEnd, uint32_t a_YBegin, uint32_t a_YEnd, FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
+{
+	a_Buffer->DrawLine( a_XBegin, a_XEnd, a_YBegin, a_YEnd, a_FragmentFn, a_FragmentFnPayload );
+}
+
+void ConsoleGL::DrawHorizontalLine( PixelBuffer* a_Buffer, uint32_t a_XBegin, uint32_t a_YBegin, uint32_t a_Length, Pixel a_Pixel )
+{
+	a_Buffer->DrawHorizontalLine( a_XBegin, a_YBegin, a_Length, a_Pixel );
+}
+
+void ConsoleGL::DrawHorizontalLineFn( PixelBuffer* a_Buffer, uint32_t a_XBegin, uint32_t a_YBegin, uint32_t a_Length, FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
+{
+	a_Buffer->DrawHorizontalLine( a_XBegin, a_YBegin, a_Length, a_FragmentFn, a_FragmentFnPayload );
+}
+
+void ConsoleGL::DrawVerticalLine( PixelBuffer* a_Buffer, uint32_t a_XBegin, uint32_t a_YBegin, uint32_t a_Length, Pixel a_Pixel )
+{
+	a_Buffer->DrawVerticalLine( a_XBegin, a_YBegin, a_Length, a_Pixel );
+}
+
+void ConsoleGL::DrawVerticalLineFn( PixelBuffer* a_Buffer, uint32_t a_XBegin, uint32_t a_YBegin, uint32_t a_Length, FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
+{
+	a_Buffer->DrawVerticalLine( a_XBegin, a_YBegin, a_Length, a_FragmentFn, a_FragmentFnPayload );
 }
 
 void ConsoleGL::DrawTriangle( PixelBuffer* a_Buffer, uint32_t a_X0, uint32_t a_X1, uint32_t a_X2, uint32_t a_Y0, uint32_t a_Y1, uint32_t a_Y2, Pixel a_Pixel )
@@ -193,9 +272,19 @@ void ConsoleGL::DrawTriangle( PixelBuffer* a_Buffer, uint32_t a_X0, uint32_t a_X
 	return a_Buffer->DrawTriangle( a_X0, a_X1, a_X2, a_Y0, a_Y1, a_Y2, a_Pixel );
 }
 
+void ConsoleGL::DrawTriangleFn( PixelBuffer* a_Buffer, uint32_t a_X0, uint32_t a_X1, uint32_t a_X2, uint32_t a_Y0, uint32_t a_Y1, uint32_t a_Y2, FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
+{
+	return a_Buffer->DrawTriangle( a_X0, a_X1, a_X2, a_Y0, a_Y1, a_Y2, a_FragmentFn, a_FragmentFnPayload );
+}
+
 void ConsoleGL::DrawTriangleFilled( PixelBuffer* a_Buffer, uint32_t a_X0, uint32_t a_X1, uint32_t a_X2, uint32_t a_Y0, uint32_t a_Y1, uint32_t a_Y2, Pixel a_Pixel )
 {
 	return a_Buffer->DrawTriangleFilled( a_X0, a_X1, a_X2, a_Y0, a_Y1, a_Y2, a_Pixel );
+}
+
+void ConsoleGL::DrawTriangleFilledFn( PixelBuffer* a_Buffer, uint32_t a_X0, uint32_t a_X1, uint32_t a_X2, uint32_t a_Y0, uint32_t a_Y1, uint32_t a_Y2, FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
+{
+	return a_Buffer->DrawTriangleFilled( a_X0, a_X1, a_X2, a_Y0, a_Y1, a_Y2, a_FragmentFn, a_FragmentFnPayload );
 }
 
 void ConsoleGL::DrawRect( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Width, uint32_t a_Height, Pixel a_Pixel )
@@ -203,12 +292,91 @@ void ConsoleGL::DrawRect( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uin
 	a_Buffer->DrawRect( a_X, a_Y, a_Width, a_Height, a_Pixel );
 }
 
-//void ConsoleGL::SetWindowRect( Window* a_Window, const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Width, const uint32_t a_Height, const Pixel a_Pixel )
-//{
-//	a_Window->GetBuffer()->DrawRect( a_X, a_Y, a_Width, a_Height, a_Pixel );
-//}
+void ConsoleGL::DrawRectFn( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Width, uint32_t a_Height, FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
+{
+	a_Buffer->DrawRect( a_X, a_Y, a_Width, a_Height, a_FragmentFn, a_FragmentFnPayload );
+}
+
+void ConsoleGL::DrawRectRotated( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Width, uint32_t a_Height, float a_Radians, Pixel a_Pixel )
+{
+	a_Buffer->DrawRect( a_X, a_Y, a_Width, a_Height, a_Radians, a_Pixel );
+}
+
+void ConsoleGL::DrawRectRotatedFn( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Width, uint32_t a_Height, float a_Radians, FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
+{
+	a_Buffer->DrawRect( a_X, a_Y, a_Width, a_Height, a_Radians, a_FragmentFn, a_FragmentFnPayload );
+}
+
+void ConsoleGL::DrawRectFilled( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Width, uint32_t a_Height, Pixel a_Pixel )
+{
+	a_Buffer->DrawRectFilled( a_X, a_Y, a_Width, a_Height, a_Pixel );
+}
+
+void ConsoleGL::DrawRectFilledFn( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Width, uint32_t a_Height, FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
+{
+	a_Buffer->DrawRectFilled( a_X, a_Y, a_Width, a_Height, a_FragmentFn, a_FragmentFnPayload );
+}
+
+void ConsoleGL::DrawRectFilledRotated( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Width, uint32_t a_Height, float a_Radians, Pixel a_Pixel )
+{
+	a_Buffer->DrawRectFilled( a_X, a_Y, a_Width, a_Height, a_Radians, a_Pixel );
+}
+
+void ConsoleGL::DrawRectFilledRotatedFn( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Width, uint32_t a_Height, float a_Radians, FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
+{
+	a_Buffer->DrawRectFilled( a_X, a_Y, a_Width, a_Height, a_Radians, a_FragmentFn, a_FragmentFnPayload );
+}
+
+void ConsoleGL::DrawCircle( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Radius, Pixel a_Pixel )
+{
+	a_Buffer->DrawCircle( a_X, a_Y, a_Radius, a_Pixel );
+}
+
+void ConsoleGL::DrawCircleFn( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Radius, FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
+{
+	a_Buffer->DrawCircle( a_X, a_Y, a_Radius, a_FragmentFn, a_FragmentFnPayload );
+}
+
+void ConsoleGL::DrawCircleFilled( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Radius, Pixel a_Pixel )
+{
+	a_Buffer->DrawCircleFilled( a_X, a_Y, a_Radius, a_Pixel );
+}
+
+void ConsoleGL::DrawCircleFilledFn( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Radius, FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
+{
+	a_Buffer->DrawCircleFilled( a_X, a_Y, a_Radius, a_FragmentFn, a_FragmentFnPayload );
+}
+
+void ConsoleGL::DrawEllipse( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_RadiusMinor, uint32_t a_RadiusMajor, Pixel a_Pixel )
+{
+	a_Buffer->DrawEllipse( a_X, a_Y, a_RadiusMinor, a_RadiusMajor, a_Pixel );
+}
+
+void ConsoleGL::DrawEllipseFn( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_RadiusMinor, uint32_t a_RadiusMajor, FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
+{
+	a_Buffer->DrawEllipse( a_X, a_Y, a_RadiusMinor, a_RadiusMajor, a_FragmentFn, a_FragmentFnPayload );
+}
+
+void ConsoleGL::DrawEllipseFilled( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_RadiusMinor, uint32_t a_RadiusMajor, Pixel a_Pixel )
+{
+	a_Buffer->DrawEllipseFilled( a_X, a_Y, a_RadiusMinor, a_RadiusMajor, a_Pixel );
+}
+
+void ConsoleGL::DrawEllipseFilledFn( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_RadiusMinor, uint32_t a_RadiusMajor, FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
+{
+	a_Buffer->DrawEllipseFilled( a_X, a_Y, a_RadiusMinor, a_RadiusMajor, a_FragmentFn, a_FragmentFnPayload );
+}
 
 #pragma endregion
+
+
+
+
+
+void ConsoleGL::DrawTestImage( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Width, uint32_t a_Height, float a_Radians, uint32_t a_SourceWidth, uint32_t a_SourceHeight, const Colour* a_Source )
+{
+	
+}
 
 
 

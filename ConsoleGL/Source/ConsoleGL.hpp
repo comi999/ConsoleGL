@@ -159,6 +159,13 @@ namespace ConsoleGL
 		constexpr void SetBackground( const EConsoleColour a_ConsoleColour ) { ( Attributes &= 0xFF0F ) |= ( static_cast< AttributesType >( a_ConsoleColour ) << 4u ); }
 	};
 
+	struct Rect
+	{
+		uint32_t x, y, w, h;
+	};
+
+	using FragmentFn = Pixel( * )( const uint32_t a_PosX, const uint32_t a_PosY, void* a_Payload );
+
 #pragma region Window functions
 
 	CONSOLEGL_API Window* CreateWindow( const char* a_Title, uint32_t a_Width, uint32_t a_Height, uint32_t a_PixelWidth, uint32_t a_PixelHeight, uint32_t a_BufferCount );
@@ -203,16 +210,49 @@ namespace ConsoleGL
 
 #pragma region PixelBuffer functions
 
-	CONSOLEGL_API Pixel* GetPixelBufferPixels( PixelBuffer* a_PixelBuffer );
+	CONSOLEGL_API Pixel* GetPixelBufferPixels( PixelBuffer* a_Buffer );
+	CONSOLEGL_API uint32_t GetPixelBufferSize( PixelBuffer* a_Buffer );
+	CONSOLEGL_API uint32_t GetPixelBufferWidth( PixelBuffer* a_Buffer );
+	CONSOLEGL_API uint32_t GetPixelBufferHeight( PixelBuffer* a_Buffer );
 
 #pragma endregion
 
 #pragma region Basic drawing functions
 
-    CONSOLEGL_API void SetWindowRect( Window* a_Window, uint32_t a_X, uint32_t a_Y, uint32_t a_Width, uint32_t a_Height, Pixel a_Pixel );
+	CONSOLEGL_API void SetPixel( PixelBuffer* a_Buffer, uint32_t a_Index, Pixel a_Pixel );
+	CONSOLEGL_API void SetPixelByPosition( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, Pixel a_Pixel );
+    CONSOLEGL_API void SetPixels( PixelBuffer* a_Buffer, uint32_t a_Index, uint32_t a_Count, Pixel a_Pixel );
+    CONSOLEGL_API void SetPixelsByPosition( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Count, Pixel a_Pixel );
+	CONSOLEGL_API void SetBuffer( PixelBuffer* a_Buffer, Pixel a_Pixel );
+	CONSOLEGL_API void SetBufferFn( PixelBuffer* a_Buffer, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+    CONSOLEGL_API void DrawLine( PixelBuffer* a_Buffer, uint32_t a_XBegin, uint32_t a_XEnd, uint32_t a_YBegin, uint32_t a_YEnd, Pixel a_Pixel );
+	CONSOLEGL_API void DrawLineFn( PixelBuffer* a_Buffer, uint32_t a_XBegin, uint32_t a_XEnd, uint32_t a_YBegin, uint32_t a_YEnd, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+    CONSOLEGL_API void DrawHorizontalLine( PixelBuffer* a_Buffer, uint32_t a_XBegin, uint32_t a_YBegin, uint32_t a_Length, Pixel a_Pixel );
+    CONSOLEGL_API void DrawHorizontalLineFn( PixelBuffer* a_Buffer, uint32_t a_XBegin, uint32_t a_YBegin, uint32_t a_Length, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+    CONSOLEGL_API void DrawVerticalLine( PixelBuffer* a_Buffer, uint32_t a_XBegin, uint32_t a_YBegin, uint32_t a_Length, Pixel a_Pixel );
+    CONSOLEGL_API void DrawVerticalLineFn( PixelBuffer* a_Buffer, uint32_t a_XBegin, uint32_t a_YBegin, uint32_t a_Length, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
     CONSOLEGL_API void DrawTriangle( PixelBuffer* a_Buffer, uint32_t a_X0, uint32_t a_X1, uint32_t a_X2, uint32_t a_Y0, uint32_t a_Y1, uint32_t a_Y2, Pixel a_Pixel );
+    CONSOLEGL_API void DrawTriangleFn( PixelBuffer* a_Buffer, uint32_t a_X0, uint32_t a_X1, uint32_t a_X2, uint32_t a_Y0, uint32_t a_Y1, uint32_t a_Y2, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
     CONSOLEGL_API void DrawTriangleFilled( PixelBuffer* a_Buffer, uint32_t a_X0, uint32_t a_X1, uint32_t a_X2, uint32_t a_Y0, uint32_t a_Y1, uint32_t a_Y2, Pixel a_Pixel );
+    CONSOLEGL_API void DrawTriangleFilledFn( PixelBuffer* a_Buffer, uint32_t a_X0, uint32_t a_X1, uint32_t a_X2, uint32_t a_Y0, uint32_t a_Y1, uint32_t a_Y2, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
 	CONSOLEGL_API void DrawRect( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Width, uint32_t a_Height, Pixel a_Pixel );
+	CONSOLEGL_API void DrawRectFn( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Width, uint32_t a_Height, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+	CONSOLEGL_API void DrawRectRotated( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Width, uint32_t a_Height, float a_Radians, Pixel a_Pixel );
+	CONSOLEGL_API void DrawRectRotatedFn( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Width, uint32_t a_Height, float a_Radians, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+	CONSOLEGL_API void DrawRectFilled( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Width, uint32_t a_Height, Pixel a_Pixel );
+	CONSOLEGL_API void DrawRectFilledFn( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Width, uint32_t a_Height, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+	CONSOLEGL_API void DrawRectFilledRotated( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Width, uint32_t a_Height, float a_Radians, Pixel a_Pixel );
+	CONSOLEGL_API void DrawRectFilledRotatedFn( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Width, uint32_t a_Height, float a_Radians, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+	CONSOLEGL_API void DrawCircle( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Radius, Pixel a_Pixel );
+	CONSOLEGL_API void DrawCircleFn( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Radius, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+	CONSOLEGL_API void DrawCircleFilled( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Radius, Pixel a_Pixel );
+	CONSOLEGL_API void DrawCircleFilledFn( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Radius, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+	CONSOLEGL_API void DrawEllipse( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_RadiusMinor, uint32_t a_RadiusMajor, Pixel a_Pixel );
+    CONSOLEGL_API void DrawEllipseFn( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_RadiusMinor, uint32_t a_RadiusMajor, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+    CONSOLEGL_API void DrawEllipseFilled( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_RadiusMinor, uint32_t a_RadiusMajor, Pixel a_Pixel );
+    CONSOLEGL_API void DrawEllipseFilledFn( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_RadiusMinor, uint32_t a_RadiusMajor, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+
+	CONSOLEGL_API void DrawTestImage( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Width, uint32_t a_Height, float a_Radians, uint32_t a_SourceWidth, uint32_t a_SourceHeight, const Colour* a_Source );
 
 #pragma endregion
 

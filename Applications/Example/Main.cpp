@@ -6,24 +6,35 @@
 #undef CreateWindow
 #include <ConsoleGL.hpp>
 
-int Width = 100, Height = 100;
+#include <stb_image/stb_image.h>
+
+int Width = 128, Height = 128;
 
 INT WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, INT nCmdShow )
 {
 	ConsoleGL::Window* window0 = ConsoleGL::CreateWindow( "window0", Width, Height, 8, 8, 2 );
 	ConsoleGL::SetActiveWindow( window0 );
 	ConsoleGL::SetWindowColoursFromSet( ConsoleGL::EColourSet::DEFAULT );
-	auto buff0 = ConsoleGL::GetWindowBuffer( window0 );
-	auto pix = *ConsoleGL::MapColourToPixel( { 255, 0, 0, 255 } );
+	/*auto pix = *ConsoleGL::MapColourToPixel( { 255, 0, 0, 255 } );
 	ConsoleGL::DrawTriangleFilled( buff0, 0, 45, 90, 23, 43, 12, pix );
 	pix = *ConsoleGL::MapColourToPixel( { 0, 128, 25, 255 } );
 	ConsoleGL::DrawTriangle( buff0, 0, 45, 90, 23, 43, 12, pix );
-	pix = *ConsoleGL::MapColourToPixel( { 0, 0, 255, 255 } );
-	ConsoleGL::DrawRect( buff0, 10, 10, 23, 23, pix );
-	ConsoleGL::SwapWindowBuffer();
+	pix = *ConsoleGL::MapColourToPixel( { 0, 0, 255, 255 } );*/
 
-	
-	ConsoleGL::Window* window1 = ConsoleGL::CreateWindow( "window1", Width, Height, 8, 8, 2 );
+	float i = 0.0f;
+
+	auto background = *ConsoleGL::MapColourToPixel( { 255, 255, 200, 255 } );
+	auto pix0 = *ConsoleGL::MapColourToPixel( { 255, 0, 0, 255 } );
+	auto pix1 = *ConsoleGL::MapColourToPixel( { 0, 255, 0, 255 } );
+
+	while ( true )
+	{
+		auto buff0 = ConsoleGL::GetWindowBuffer( window0 );
+		
+		ConsoleGL::SwapWindowBuffer();
+	}
+
+	/*ConsoleGL::Window* window1 = ConsoleGL::CreateWindow( "window1", Width, Height, 8, 8, 2 );
 	ConsoleGL::SetActiveWindow( window1 );
 	ConsoleGL::SetWindowColoursFromSet( ConsoleGL::EColourSet::SEPIA );
 	auto buff1 = ConsoleGL::GetWindowBuffer( window1 );
@@ -34,7 +45,7 @@ INT WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine
 	pix = *ConsoleGL::MapColourToPixel( { 0, 0, 255, 255 } );
 	ConsoleGL::DrawRect( buff1, 10, 10, 12, 54, pix );
 	ConsoleGL::SwapWindowBuffer();
-	system("pause");
+	system("pause");*/
 	/*ConsoleGL::Window* window0 = ConsoleGL::CreateWindow( "window0", Width, Height, 8, 8, 2 );
 	ConsoleGL::Window* window1 = ConsoleGL::CreateWindow( "window1", Width, Height, 8, 8, 2 );
 	ConsoleGL::Window* window2 = ConsoleGL::CreateWindow( "window2", Width, Height, 8, 8, 2 );

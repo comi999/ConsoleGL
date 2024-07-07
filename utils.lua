@@ -280,6 +280,7 @@ function create_app(name, apps_folder, consolegl_folder)
 	
 	local app_dependencies = {
 		"glm",
+		"stb_image",
 	}
 	
 	project(name)
