@@ -8,7 +8,7 @@
 
 #include <stb_image/stb_image.h>
 
-int Width = 128, Height = 128;
+int Width = 100, Height = 100;
 
 INT WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, INT nCmdShow )
 {
@@ -31,6 +31,7 @@ INT WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine
 	{
 		auto buff0 = ConsoleGL::GetWindowBuffer( window0 );
 		
+		ConsoleGL::DrawTriangleFilled( buff0, 0, 45, 90, 23, 43, 12, pix0 );
 		ConsoleGL::SwapWindowBuffer();
 	}
 

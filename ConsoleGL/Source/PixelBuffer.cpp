@@ -1,4 +1,5 @@
 #include <memory>
+#include <algorithm>
 
 #include <glm/gtx/rotate_vector.hpp>
 #include <PixelBuffer.hpp>

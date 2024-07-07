@@ -1,5 +1,4 @@
 #include <chrono>
-#include <algorithm>
 
 #include <Window.hpp>
 
