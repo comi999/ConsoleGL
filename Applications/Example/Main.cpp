@@ -30,8 +30,32 @@ INT WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine
 	while ( true )
 	{
 		auto buff0 = ConsoleGL::GetWindowBuffer( window0 );
+
+		struct Tri
+		{
+			ConsoleGL::Coord P0 = { 0, 0 };
+			ConsoleGL::Coord P1 = { ( uint32_t )( Width/2 ), ( uint32_t )( Height-1 ) };
+			ConsoleGL::Coord P2 = { ( uint32_t )( Width-1 ), ( uint32_t )( 0 ) };
+		} tri;
 		
-		ConsoleGL::DrawTriangleFilled( buff0, 0, 45, 90, 23, 43, 12, pix0 );
+		auto fn = +[]( const uint32_t X, const uint32_t Y, void* a_Tri ) -> ConsoleGL::Pixel
+		{
+			auto P0 = static_cast< Tri* >( a_Tri )->P0;
+			auto P1 = static_cast< Tri* >( a_Tri )->P1;
+			auto P2 = static_cast< Tri* >( a_Tri )->P2;
+
+			float x = X, y = Y, x1 = P0.x, y1 = P0.y, x2 = P1.x, y2 = P1.y, x3 = P2.x, y3 = P2.y;
+
+			float L1 = ((y2-y3)*(x-x3)+(x3-x2)*(y-y3))/((y2-y3)*(x1-x3)+(x3-x2)*(y1-y3));
+			float L2 = ((y3-y1)*(x-x3)+(x1-x3)*(y-y3))/((y2-y3)*(x1-x3)+(x3-x2)*(y1-y3));
+			float L3 = 1.0f - L1 - L2;
+
+			ConsoleGL::Colour c{ L1, L2, L3 };
+			auto pixel = *ConsoleGL::MapColourToPixel( c );
+			return pixel;
+		};
+		
+		ConsoleGL::DrawTriangleFilledFn( buff0, tri.P0, tri.P1, tri.P2, fn, &tri );
 		ConsoleGL::SwapWindowBuffer();
 	}
 

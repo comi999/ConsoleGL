@@ -56,6 +56,29 @@ namespace ConsoleGL
 				/*Bright_Yellow */  { 85,  170, 170 },
 				/*White         */  { 170, 170, 170 }
 			};
+
+			//struct Vec2{ float x, y; };
+
+			// Seeding colours placed distributed over rgb triangle
+			/*Vec2 BarycentricCoords[] = 
+			{
+				{ 0.0f, 0.0f,      },
+				{ 100.0f, 0.0f,	   },
+				{ 50.0f, 86.6f,	   },
+				{ 50.0f, 28.86f,   },
+				{ 33.3f, 0.0f,	   },
+				{ 66.6f, 0.0f,	   },
+				{ 83.29f, 28.93f,  },
+				{ 66.6f, 57.64f,   },
+				{ 33.3f, 57.64f,   },
+				{ 16.6f, 28.86f,   },
+				{ 37.50f, 21.64f,  },
+				{ 62.49f, 21.65f,  },
+				{ 50.00f, 43.30f,  },
+				{ 16.66f, 9.63f,   },
+				{ 83.33f, 9.61f,   },
+				{ 50.00f, 70.00f,  },
+			};*/
 	
 			// Set initial seed colours first.
 			for ( size_t i = 0u; i < 16u; ++i )

@@ -5,7 +5,7 @@
 #define PIXEL_MAP_MAX_MIP_LEVEL 7
 
 // Defines resolution of RGB cube. n between 0 to 7 where rgb resolution is (256 >> n)
-#define PIXEL_MAP_MIP_LEVEL 4
+#define PIXEL_MAP_MIP_LEVEL 0
 
 // Defines the side length in pixels of the RGB cube.
 #define PIXEL_MAP_SIZE (256 >> PIXEL_MAP_MIP_LEVEL)
@@ -159,14 +159,15 @@ namespace ConsoleGL
 		constexpr void SetBackground( const EConsoleColour a_ConsoleColour ) { ( Attributes &= 0xFF0F ) |= ( static_cast< AttributesType >( a_ConsoleColour ) << 4u ); }
 	};
 
-	struct Coord
-	{
-		uint32_t x, y;
-	};
+	struct Coord { uint32_t x, y; };
 
 	struct Rect
 	{
-		uint32_t x, y, w, h;
+		union
+		{
+			struct { uint32_t x, y, w, h; };
+			struct { Coord Origin, Size; };
+		};
 	};
 
 	using FragmentFn = Pixel( * )( const uint32_t a_PosX, const uint32_t a_PosY, void* a_Payload );
@@ -189,11 +190,6 @@ namespace ConsoleGL
     CONSOLEGL_API uint32_t GetWindowBufferCount( Window* a_Window );
     CONSOLEGL_API PixelBuffer* GetWindowBuffer( Window* a_Window );
     CONSOLEGL_API PixelBuffer* GetWindowBufferByIndex( Window* a_Window, uint32_t a_Index );
-    //CONSOLEGL_API void SetWindowBuffer( Window* a_Window, Pixel a_Pixel );
-    //CONSOLEGL_API void SetWindowPixelByIndex( Window* a_Window, uint32_t a_Index, Pixel a_Pixel );
-    //CONSOLEGL_API void SetWindowPixelByPosition( Window* a_Window, uint32_t a_X, uint32_t a_Y, Pixel a_Pixel );
-    //CONSOLEGL_API void SetWindowPixelsByIndex( Window* a_Window, uint32_t a_Index, uint32_t a_Count, Pixel a_Pixel );
-    //CONSOLEGL_API void SetWindowPixelsByPosition( Window* a_Window, uint32_t a_X, uint32_t a_Y, uint32_t a_Count, Pixel a_Pixel );
 
 #pragma endregion
 
@@ -252,10 +248,10 @@ namespace ConsoleGL
 	CONSOLEGL_API void DrawCircleFn( PixelBuffer* a_Buffer, Coord a_Centre, uint32_t a_Radius, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
 	CONSOLEGL_API void DrawCircleFilled( PixelBuffer* a_Buffer, Coord a_Centre, uint32_t a_Radius, Pixel a_Pixel );
 	CONSOLEGL_API void DrawCircleFilledFn( PixelBuffer* a_Buffer, Coord a_Centre, uint32_t a_Radius, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
-	CONSOLEGL_API void DrawEllipse( PixelBuffer* a_Buffer, Coord a_Centre, uint32_t a_RadiusMinor, uint32_t a_RadiusMajor, Pixel a_Pixel );
-    CONSOLEGL_API void DrawEllipseFn( PixelBuffer* a_Buffer, Coord a_Centre, uint32_t a_RadiusMinor, uint32_t a_RadiusMajor, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
-    CONSOLEGL_API void DrawEllipseFilled( PixelBuffer* a_Buffer, Coord a_Centre, uint32_t a_RadiusMinor, uint32_t a_RadiusMajor, Pixel a_Pixel );
-    CONSOLEGL_API void DrawEllipseFilledFn( PixelBuffer* a_Buffer, Coord a_Centre, uint32_t a_RadiusMinor, uint32_t a_RadiusMajor, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+	CONSOLEGL_API void DrawEllipse( PixelBuffer* a_Buffer, Coord a_Centre, Coord a_Radius, Pixel a_Pixel );
+    CONSOLEGL_API void DrawEllipseFn( PixelBuffer* a_Buffer, Coord a_Centre, Coord a_Radius, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+    CONSOLEGL_API void DrawEllipseFilled( PixelBuffer* a_Buffer, Coord a_Centre, Coord a_Radius, Pixel a_Pixel );
+    CONSOLEGL_API void DrawEllipseFilledFn( PixelBuffer* a_Buffer, Coord a_Centre, Coord a_Radius, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
 
 	CONSOLEGL_API void DrawTestImage( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Width, uint32_t a_Height, float a_Radians, uint32_t a_SourceWidth, uint32_t a_SourceHeight, const Colour* a_Source );
 

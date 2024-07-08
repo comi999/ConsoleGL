@@ -24,51 +24,51 @@ public:
     
     // Pixel operations.
     void SetPixel( const uint32_t a_Index, const Pixel a_Pixel ) { m_Pixels[ a_Index ] = a_Pixel; }
-    void SetPixel( const uint32_t a_X, const uint32_t a_Y, const Pixel a_Pixel ) { SetPixel( a_Y * m_Width + a_X, a_Pixel ); }
+    void SetPixel( const Coord a_Position, const Pixel a_Pixel ) { SetPixel( a_Position.y * m_Width + a_Position.x, a_Pixel ); }
 
     void SetPixels( const uint32_t a_Index, const uint32_t a_Count, const Pixel a_Pixel ) { for ( Pixel* Begin = m_Pixels + a_Index, *End = Begin + a_Count; Begin != End; ++Begin ) *Begin = a_Pixel; }
-    void SetPixels( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Count, const Pixel a_Pixel ) { SetPixels( a_Y * m_Width + a_X, a_Count, a_Pixel ); }
+    void SetPixels( const Coord a_Position, const uint32_t a_Count, const Pixel a_Pixel ) { SetPixels( a_Position.y * m_Width + a_Position.x, a_Count, a_Pixel ); }
 
     // Region operations
     void SetBuffer( const Pixel a_Pixel ) { SetPixels( 0u, GetSize(), a_Pixel ); }
     void SetBuffer( const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
 
-    void DrawLine( const uint32_t a_XBegin, const uint32_t a_XEnd, const uint32_t a_YBegin, const uint32_t a_YEnd, const Pixel a_Pixel ) { DrawLine( a_XBegin, a_XEnd, a_YBegin, a_YEnd, IN_PLACE_PIXEL ); }
-    void DrawLine( const uint32_t a_XBegin, const uint32_t a_XEnd, const uint32_t a_YBegin, const uint32_t a_YEnd, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+    void DrawLine( const Coord a_Begin, const Coord a_End, const Pixel a_Pixel ) { DrawLine( a_Begin, a_End, IN_PLACE_PIXEL ); }
+    void DrawLine( const Coord a_Begin, const Coord a_End, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
 
-    void DrawHorizontalLine( const uint32_t a_XBegin, const uint32_t a_YBegin, const uint32_t a_Length, const Pixel a_Pixel ) { SetPixels( a_XBegin, a_YBegin, a_Length, a_Pixel ); }
-    void DrawHorizontalLine( const uint32_t a_XBegin, const uint32_t a_YBegin, const uint32_t a_Length, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+    void DrawHorizontalLine( const Coord a_Begin, const uint32_t a_Length, const Pixel a_Pixel ) { SetPixels( a_Begin, a_Length, a_Pixel ); }
+    void DrawHorizontalLine( const Coord a_Begin, const uint32_t a_Length, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
 
-    void DrawVerticalLine( const uint32_t a_XBegin, const uint32_t a_YBegin, const uint32_t a_Length, const Pixel a_Pixel ) { DrawVerticalLine( a_XBegin, a_YBegin, a_Length, IN_PLACE_PIXEL ); }
-    void DrawVerticalLine( const uint32_t a_XBegin, const uint32_t a_YBegin, const uint32_t a_Length, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+    void DrawVerticalLine( const Coord a_Begin, const uint32_t a_Length, const Pixel a_Pixel ) { DrawVerticalLine( a_Begin, a_Length, IN_PLACE_PIXEL ); }
+    void DrawVerticalLine( const Coord a_Begin, const uint32_t a_Length, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
 
-    void DrawTriangle( const uint32_t a_X0, const uint32_t a_X1, const uint32_t a_X2, const uint32_t a_Y0, const uint32_t a_Y1, const uint32_t a_Y2, const Pixel a_Pixel ) { DrawTriangle( a_X0, a_X1, a_X2, a_Y0, a_Y1, a_Y2, IN_PLACE_PIXEL ); }
-    void DrawTriangle( const uint32_t a_X0, const uint32_t a_X1, const uint32_t a_X2, const uint32_t a_Y0, const uint32_t a_Y1, const uint32_t a_Y2, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+    void DrawTriangle( const Coord a_P0, const Coord a_P1, const Coord a_P2, const Pixel a_Pixel ) { DrawTriangle( a_P0, a_P1, a_P2, IN_PLACE_PIXEL ); }
+    void DrawTriangle( const Coord a_P0, const Coord a_P1, const Coord a_P2, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
     
-    void DrawTriangleFilled( const uint32_t a_X0, const uint32_t a_X1, const uint32_t a_X2, const uint32_t a_Y0, const uint32_t a_Y1, const uint32_t a_Y2, const Pixel a_Pixel ) { DrawTriangleFilled( a_X0, a_X1, a_X2, a_Y0, a_Y1, a_Y2, IN_PLACE_PIXEL ); }
-    void DrawTriangleFilled( const uint32_t a_X0, const uint32_t a_X1, const uint32_t a_X2, const uint32_t a_Y0, const uint32_t a_Y1, const uint32_t a_Y2, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+    void DrawTriangleFilled( const Coord a_P0, const Coord a_P1, const Coord a_P2, const Pixel a_Pixel ) { DrawTriangleFilled( a_P0, a_P1, a_P2, IN_PLACE_PIXEL ); }
+    void DrawTriangleFilled( const Coord a_P0, const Coord a_P1, const Coord a_P2, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
 
-    void DrawRect( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Width, const uint32_t a_Height, const Pixel a_Pixel ) { DrawRect( a_X, a_Y, a_Width, a_Height, IN_PLACE_PIXEL ); }
-    void DrawRect( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Width, const uint32_t a_Height, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
-    void DrawRect( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Width, const uint32_t a_Height, const float a_Radians, const Pixel a_Pixel ) { DrawRect( a_X, a_Y, a_Width, a_Height, a_Radians, IN_PLACE_PIXEL ); }
-    void DrawRect( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Width, const uint32_t a_Height, const float a_Radians, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+    void DrawRect( const Rect& a_Rect, const Pixel a_Pixel ) { DrawRect( a_Rect, IN_PLACE_PIXEL ); }
+    void DrawRect( const Rect& a_Rect, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+    void DrawRect( const Rect& a_Rect, const float a_Radians, const Pixel a_Pixel ) { DrawRect( a_Rect, a_Radians, IN_PLACE_PIXEL ); }
+    void DrawRect( const Rect& a_Rect, const float a_Radians, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
     
-    void DrawRectFilled( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Width, const uint32_t a_Height, const Pixel a_Pixel ) { DrawRectFilled( a_X, a_Y, a_Width, a_Height, IN_PLACE_PIXEL ); }
-    void DrawRectFilled( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Width, const uint32_t a_Height, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
-    void DrawRectFilled( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Width, const uint32_t a_Height, const float a_Radians, const Pixel a_Pixel ) { DrawRectFilled( a_X, a_Y, a_Width, a_Height, a_Radians, IN_PLACE_PIXEL ); }
-    void DrawRectFilled( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Width, const uint32_t a_Height, const float a_Radians, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+    void DrawRectFilled( const Rect& a_Rect, const Pixel a_Pixel ) { DrawRectFilled( a_Rect, IN_PLACE_PIXEL ); }
+    void DrawRectFilled( const Rect& a_Rect, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+    void DrawRectFilled( const Rect& a_Rect, const float a_Radians, const Pixel a_Pixel ) { DrawRectFilled( a_Rect, a_Radians, IN_PLACE_PIXEL ); }
+    void DrawRectFilled( const Rect& a_Rect, const float a_Radians, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
 
-    void DrawCircle( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Radius, const Pixel a_Pixel ) { DrawCircle( a_X, a_Y, a_Radius, IN_PLACE_PIXEL ); }
-    void DrawCircle( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Radius, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+    void DrawCircle( const Coord a_Centre, const uint32_t a_Radius, const Pixel a_Pixel ) { DrawCircle( a_Centre, a_Radius, IN_PLACE_PIXEL ); }
+    void DrawCircle( const Coord a_Centre, const uint32_t a_Radius, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
 
-    void DrawCircleFilled( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Radius, const Pixel a_Pixel ) { DrawCircleFilled( a_X, a_Y, a_Radius, IN_PLACE_PIXEL ); }
-    void DrawCircleFilled( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_Radius, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+    void DrawCircleFilled( const Coord a_Centre, const uint32_t a_Radius, const Pixel a_Pixel ) { DrawCircleFilled( a_Centre, a_Radius, IN_PLACE_PIXEL ); }
+    void DrawCircleFilled( const Coord a_Centre, const uint32_t a_Radius, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
 
-    void DrawEllipse( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_RadiusMinor, const uint32_t a_RadiusMajor, const Pixel a_Pixel ) { DrawEllipse( a_X, a_Y, a_RadiusMinor, a_RadiusMajor, IN_PLACE_PIXEL ); }
-    void DrawEllipse( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_RadiusMinor, const uint32_t a_RadiusMajor, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+    void DrawEllipse( const Coord a_Centre, const Coord a_Radius, const Pixel a_Pixel ) { DrawEllipse( a_Centre, a_Radius, IN_PLACE_PIXEL ); }
+    void DrawEllipse( const Coord a_Centre, const Coord a_Radius, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
     
-    void DrawEllipseFilled( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_RadiusMinor, const uint32_t a_RadiusMajor, const Pixel a_Pixel ) { DrawEllipseFilled( a_X, a_Y, a_RadiusMinor, a_RadiusMajor, IN_PLACE_PIXEL ); }
-    void DrawEllipseFilled( const uint32_t a_X, const uint32_t a_Y, const uint32_t a_RadiusMinor, const uint32_t a_RadiusMajor, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+    void DrawEllipseFilled( const Coord a_Centre, const Coord a_Radius, const Pixel a_Pixel ) { DrawEllipseFilled( a_Centre, a_Radius, IN_PLACE_PIXEL ); }
+    void DrawEllipseFilled( const Coord a_Centre, const Coord a_Radius, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
 
     // Text operations
 
