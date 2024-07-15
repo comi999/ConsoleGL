@@ -5,7 +5,7 @@
 #define PIXEL_MAP_MAX_MIP_LEVEL 7
 
 // Defines resolution of RGB cube. n between 0 to 7 where rgb resolution is (256 >> n)
-#define PIXEL_MAP_MIP_LEVEL 0
+#define PIXEL_MAP_MIP_LEVEL 4
 
 // Defines the side length in pixels of the RGB cube.
 #define PIXEL_MAP_SIZE (256 >> PIXEL_MAP_MIP_LEVEL)
@@ -13,11 +13,180 @@
 // Defines the volume of the RGB cube.
 #define PIXEL_MAP_VOLUME (PIXEL_MAP_SIZE * PIXEL_MAP_SIZE * PIXEL_MAP_SIZE)
 
+// Defines how many objects of each type can be made.
+#define WINDOW_MAX_COUNT 32
+#define CONTEXT_MAX_COUNT 32
+#define SHADER_MAX_COUNT 32
+#define SHADER_PROGRAM_MAX_COUNT 32
+
+#define SHADER_INFO_LOG_MAX 4096
+
 namespace ConsoleGL
 {
-	class Window;
-	class Context;
+	struct Window;
+	struct Context;
+	struct Shader;
+	struct ShaderProgram;
+
 	class PixelBuffer;
+
+	using WindowHandle = Window*;
+	using ContextHandle = Context*;
+	using ShaderHandle = Shader*;
+	using ShaderProgramHandle = ShaderProgram*;
+
+	enum EError
+	{
+		Error_NoError,
+		Error_ArgumentError,
+
+		Error_WindowDockCreationFailure,
+		Error_WindowFailure,
+
+		Error_NoActiveWindow,
+		Error_NoActiveContext,
+		Error_NoActiveShaderProgram,
+
+		Error_WindowCapacityReached,
+		Error_ContextCapacityReached,
+		Error_ShaderCapacityReached,
+		Error_ShaderProgramCapacityReached,
+
+		Error_InvalidWindowHandle,
+		Error_InvalidContextHandle,
+		Error_InvalidShaderHandle,
+		Error_InvalidShaderProgramHandle,
+
+		Error_ShaderCompilerWriteFailure,
+		Error_ShaderCompilerPipeCreationFailure,
+		Error_ShaderCompilerProcessCreationFailure,
+		Error_ShaderSourceFileCreationFailure,
+		Error_ShaderSourceFileCleanupFailure,
+		Error_ShaderBinaryFileCleanupFailure,
+		Error_ShaderBinaryFileLoadFailure,
+		Error_ShaderBinaryLoadFailure,
+		Error_ShaderEntryNotFound,
+		Error_ShaderInfoNotFound,
+		Error_ShaderAlreadyCompiled,
+		Error_ShaderProgramAlreadyLinked,
+		Error_ShaderProgramLinkFailure
+	};
+
+	enum class EKeyboardKey : uint8_t
+	{
+		Backspace,
+		Tab,
+		Enter,
+		Shift,
+		Ctrl,
+		Alt,
+		Caps,
+		Esc,
+		Space,
+		PageUp,
+		PageDown,
+		End,
+		Home,
+		Left,
+		Up,
+		Right,
+		Down,
+		PrintScrn,
+		Insert,
+		Delete,
+		Zero,
+		One,
+		Two,
+		Three,
+		Four,
+		Five,
+		Six,
+		Seven,
+		Eight,
+		Nine,
+		A,
+		B,
+		C,
+		D,
+		E,
+		F,
+		G,
+		H,
+		I,
+		J,
+		K,
+		L,
+		M,
+		N,
+		O,
+		P,
+		Q,
+		R,
+		S,
+		T,
+		U,
+		V,
+		W,
+		X,
+		Y,
+		Z,
+		F1,
+		F2,
+		F3,
+		F4,
+		F5,
+		F6,
+		F7,
+		F8,
+		F9,
+		F10,
+		F11,
+		F12,
+		F13,
+		F14,
+		F15,
+		F16,
+		F17,
+		F18,
+		F19,
+		F20,
+		F21,
+		F22,
+		F23,
+		F24,
+		NumLock,
+		ScrollLock,
+		LeftShift,
+		RightShift,
+		LeftCtrl,
+		RightCtrl,
+		LeftMenu,
+		RightMenu,
+		Semicolon,
+		Plus,
+		Comma,
+		Minus,
+		Period,
+		Forwardslash,
+		Tilda,
+		LeftBracket,
+		Backslash,
+		RightBracket,
+		InvertedComma
+	};
+	
+	enum class EMouseButton : uint8_t
+	{
+		LeftMouse,
+		RightMouse,
+		MiddleMouse,
+	};
+
+	enum class EShaderType
+	{
+		Vertex,
+		Fragment,
+	};
 
 	enum class EColourSet
 	{
@@ -161,6 +330,17 @@ namespace ConsoleGL
 
 	struct Coord { uint32_t x, y; };
 
+	struct Seg
+	{
+		union
+		{
+			struct { Coord p0, p1; };
+			struct { uint32_t x0, y0, x1, y1; };
+		};
+	};
+
+	struct Tri { Coord p0, p1, p2; };
+
 	struct Rect
 	{
 		union
@@ -170,26 +350,57 @@ namespace ConsoleGL
 		};
 	};
 
-	using FragmentFn = Pixel( * )( const uint32_t a_PosX, const uint32_t a_PosY, void* a_Payload );
+	using FragmentFn = Pixel( * )( Coord a_Coord, void* a_State );
+
+	CONSOLEGL_API EError GetLastError();
+	CONSOLEGL_API const char* GetLastErrorMessage();
+	CONSOLEGL_API const char* GetErrorMessage( EError a_Error );
 
 #pragma region Window functions
 
-	CONSOLEGL_API Window* CreateWindow( const char* a_Title, uint32_t a_Width, uint32_t a_Height, uint32_t a_PixelWidth, uint32_t a_PixelHeight, uint32_t a_BufferCount );
-    CONSOLEGL_API void DestroyWindow( Window* a_Window );
-    CONSOLEGL_API void SetActiveWindow( Window* a_Window );
-    CONSOLEGL_API Window* GetActiveWindow();
-    CONSOLEGL_API void SetWindowTitle( const char* a_Title ); 
+#undef CreateWindow
+	CONSOLEGL_API WindowHandle CreateWindow( const char* a_Title, uint32_t a_Width, uint32_t a_Height, uint32_t a_PixelWidth, uint32_t a_PixelHeight, uint32_t a_BufferCount );
+    CONSOLEGL_API void DestroyWindow( WindowHandle a_Window );
+    CONSOLEGL_API void SetActiveWindow( WindowHandle a_Window );
+    CONSOLEGL_API WindowHandle GetActiveWindow();
+    CONSOLEGL_API void SetWindowTitle( const char* a_Title );
     CONSOLEGL_API void SetWindowColoursFromArray( const Colour* a_Colours );
     CONSOLEGL_API void SetWindowColoursFromSet( EColourSet a_ColourSet );
     CONSOLEGL_API void SwapWindowBuffer();
     CONSOLEGL_API void SwapWindowBufferByIndex( uint32_t a_Index );
-    CONSOLEGL_API const char* GetWindowTitle( Window* a_Window );
-    CONSOLEGL_API uint32_t GetWindowWidth( Window* a_Window );
-    CONSOLEGL_API uint32_t GetWindowHeight( Window* a_Window );
-    CONSOLEGL_API uint32_t GetWindowBufferIndex( Window* a_Window );
-    CONSOLEGL_API uint32_t GetWindowBufferCount( Window* a_Window );
-    CONSOLEGL_API PixelBuffer* GetWindowBuffer( Window* a_Window );
-    CONSOLEGL_API PixelBuffer* GetWindowBufferByIndex( Window* a_Window, uint32_t a_Index );
+    CONSOLEGL_API const char* GetWindowTitle( WindowHandle a_Window );
+    CONSOLEGL_API uint32_t GetWindowWidth( WindowHandle a_Window );
+    CONSOLEGL_API uint32_t GetWindowHeight( WindowHandle a_Window );
+    CONSOLEGL_API uint32_t GetWindowBufferIndex( WindowHandle a_Window );
+    CONSOLEGL_API uint32_t GetWindowBufferCount( WindowHandle a_Window );
+    CONSOLEGL_API PixelBuffer* GetWindowBuffer( WindowHandle a_Window );
+    CONSOLEGL_API PixelBuffer* GetWindowBufferByIndex( WindowHandle a_Window, uint32_t a_Index );
+
+#pragma endregion
+
+#pragma region Context functions
+
+	CONSOLEGL_API ContextHandle CreateContext();
+	CONSOLEGL_API bool DestroyContext( ContextHandle a_Context );
+	CONSOLEGL_API void SetActiveContext( ContextHandle a_Context );
+	CONSOLEGL_API ContextHandle GetActiveContext();
+	CONSOLEGL_API size_t GetContextCount();
+
+#pragma endregion
+
+#pragma region Input functions
+
+	CONSOLEGL_API bool IsKeyDown( EKeyboardKey a_KeyboardKey );
+	CONSOLEGL_API bool IsKeyUp( EKeyboardKey a_KeyboardKey );
+	CONSOLEGL_API bool IsKeyPressed( EKeyboardKey a_KeyboardKey );
+	CONSOLEGL_API bool IsKeyReleased( EKeyboardKey a_KeyboardKey );
+	CONSOLEGL_API bool IsMouseDown( EMouseButton a_MouseButton );
+	CONSOLEGL_API bool IsMouseUp( EMouseButton a_MouseButton );
+	CONSOLEGL_API bool IsMousePressed( EMouseButton a_MouseButton );
+	CONSOLEGL_API bool IsMouseReleased( EMouseButton a_MouseButton );
+	CONSOLEGL_API void GetMousePosition( float& o_X, float& o_Y );
+	CONSOLEGL_API void GetMouseDelta( float& o_X, float& o_Y );
+	CONSOLEGL_API void PollEvents();
 
 #pragma endregion
 
@@ -198,15 +409,6 @@ namespace ConsoleGL
 	CONSOLEGL_API const Pixel* MapColourToPixel( Colour a_Colour );
 	CONSOLEGL_API size_t GetPixelMapSize();
 	CONSOLEGL_API const Pixel* GetPixelMap();
-#pragma endregion
-
-#pragma region Context functions
-
-	CONSOLEGL_API Context* CreateContext();
-	CONSOLEGL_API void DestroyContext( Context* a_Context );
-	CONSOLEGL_API void SetActiveContext( Context* a_Context );
-	CONSOLEGL_API Context* GetActiveContext();
-
 #pragma endregion
 
 #pragma region PixelBuffer functions
@@ -225,43 +427,139 @@ namespace ConsoleGL
     CONSOLEGL_API void SetPixels( PixelBuffer* a_Buffer, uint32_t a_Index, uint32_t a_Count, Pixel a_Pixel );
     CONSOLEGL_API void SetPixelsByPosition( PixelBuffer* a_Buffer, Coord a_Position, uint32_t a_Count, Pixel a_Pixel );
 	CONSOLEGL_API void SetBuffer( PixelBuffer* a_Buffer, Pixel a_Pixel );
-	CONSOLEGL_API void SetBufferFn( PixelBuffer* a_Buffer, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
-    CONSOLEGL_API void DrawLine( PixelBuffer* a_Buffer, Coord a_Begin, Coord a_End, Pixel a_Pixel );
-	CONSOLEGL_API void DrawLineFn( PixelBuffer* a_Buffer, Coord a_Begin, Coord a_End, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+	CONSOLEGL_API void SetBufferFn( PixelBuffer* a_Buffer, FragmentFn a_FragmentFn, void* a_State );
+    CONSOLEGL_API void DrawLine( PixelBuffer* a_Buffer, const Seg& a_Segment, Pixel a_Pixel );
+	CONSOLEGL_API void DrawLineFn( PixelBuffer* a_Buffer, const Seg& a_Segment, FragmentFn a_FragmentFn, void* a_State );
     CONSOLEGL_API void DrawHorizontalLine( PixelBuffer* a_Buffer, Coord a_Begin, uint32_t a_Length, Pixel a_Pixel );
-    CONSOLEGL_API void DrawHorizontalLineFn( PixelBuffer* a_Buffer, Coord a_Begin, uint32_t a_Length, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+    CONSOLEGL_API void DrawHorizontalLineFn( PixelBuffer* a_Buffer, Coord a_Begin, uint32_t a_Length, FragmentFn a_FragmentFn, void* a_State );
     CONSOLEGL_API void DrawVerticalLine( PixelBuffer* a_Buffer, Coord a_Begin, uint32_t a_Length, Pixel a_Pixel );
-    CONSOLEGL_API void DrawVerticalLineFn( PixelBuffer* a_Buffer, Coord a_Begin, uint32_t a_Length, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
-    CONSOLEGL_API void DrawTriangle( PixelBuffer* a_Buffer, Coord a_P0, Coord a_P1, Coord a_P2, Pixel a_Pixel );
-    CONSOLEGL_API void DrawTriangleFn( PixelBuffer* a_Buffer, Coord a_P0, Coord a_P1, Coord a_P2, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
-    CONSOLEGL_API void DrawTriangleFilled( PixelBuffer* a_Buffer, Coord a_P0, Coord a_P1, Coord a_P2, Pixel a_Pixel );
-    CONSOLEGL_API void DrawTriangleFilledFn( PixelBuffer* a_Buffer, Coord a_P0, Coord a_P1, Coord a_P2, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+    CONSOLEGL_API void DrawVerticalLineFn( PixelBuffer* a_Buffer, Coord a_Begin, uint32_t a_Length, FragmentFn a_FragmentFn, void* a_State );
+    CONSOLEGL_API void DrawTriangle( PixelBuffer* a_Buffer, const Tri& a_Tri, Pixel a_Pixel );
+    CONSOLEGL_API void DrawTriangleFn( PixelBuffer* a_Buffer, const Tri& a_Tri, FragmentFn a_FragmentFn, void* a_State );
+    CONSOLEGL_API void DrawTriangleFilled( PixelBuffer* a_Buffer, const Tri& a_Tri, Pixel a_Pixel );
+    CONSOLEGL_API void DrawTriangleFilledFn( PixelBuffer* a_Buffer, const Tri& a_Tri, FragmentFn a_FragmentFn, void* a_State );
 	CONSOLEGL_API void DrawRect( PixelBuffer* a_Buffer, const Rect& a_Rect, Pixel a_Pixel );
-	CONSOLEGL_API void DrawRectFn( PixelBuffer* a_Buffer, const Rect& a_Rect, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+	CONSOLEGL_API void DrawRectFn( PixelBuffer* a_Buffer, const Rect& a_Rect, FragmentFn a_FragmentFn, void* a_State );
 	CONSOLEGL_API void DrawRectRotated( PixelBuffer* a_Buffer, const Rect& a_Rect, float a_Radians, Pixel a_Pixel );
-	CONSOLEGL_API void DrawRectRotatedFn( PixelBuffer* a_Buffer, const Rect& a_Rect, float a_Radians, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+	CONSOLEGL_API void DrawRectRotatedFn( PixelBuffer* a_Buffer, const Rect& a_Rect, float a_Radians, FragmentFn a_FragmentFn, void* a_State );
 	CONSOLEGL_API void DrawRectFilled( PixelBuffer* a_Buffer, const Rect& a_Rect, Pixel a_Pixel );
-	CONSOLEGL_API void DrawRectFilledFn( PixelBuffer* a_Buffer, const Rect& a_Rect, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+	CONSOLEGL_API void DrawRectFilledFn( PixelBuffer* a_Buffer, const Rect& a_Rect, FragmentFn a_FragmentFn, void* a_State );
 	CONSOLEGL_API void DrawRectFilledRotated( PixelBuffer* a_Buffer, const Rect& a_Rect, float a_Radians, Pixel a_Pixel );
-	CONSOLEGL_API void DrawRectFilledRotatedFn( PixelBuffer* a_Buffer, const Rect& a_Rect, float a_Radians, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+	CONSOLEGL_API void DrawRectFilledRotatedFn( PixelBuffer* a_Buffer, const Rect& a_Rect, float a_Radians, FragmentFn a_FragmentFn, void* a_State );
 	CONSOLEGL_API void DrawCircle( PixelBuffer* a_Buffer, Coord a_Centre, uint32_t a_Radius, Pixel a_Pixel );
-	CONSOLEGL_API void DrawCircleFn( PixelBuffer* a_Buffer, Coord a_Centre, uint32_t a_Radius, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+	CONSOLEGL_API void DrawCircleFn( PixelBuffer* a_Buffer, Coord a_Centre, uint32_t a_Radius, FragmentFn a_FragmentFn, void* a_State );
 	CONSOLEGL_API void DrawCircleFilled( PixelBuffer* a_Buffer, Coord a_Centre, uint32_t a_Radius, Pixel a_Pixel );
-	CONSOLEGL_API void DrawCircleFilledFn( PixelBuffer* a_Buffer, Coord a_Centre, uint32_t a_Radius, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+	CONSOLEGL_API void DrawCircleFilledFn( PixelBuffer* a_Buffer, Coord a_Centre, uint32_t a_Radius, FragmentFn a_FragmentFn, void* a_State );
 	CONSOLEGL_API void DrawEllipse( PixelBuffer* a_Buffer, Coord a_Centre, Coord a_Radius, Pixel a_Pixel );
-    CONSOLEGL_API void DrawEllipseFn( PixelBuffer* a_Buffer, Coord a_Centre, Coord a_Radius, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+    CONSOLEGL_API void DrawEllipseFn( PixelBuffer* a_Buffer, Coord a_Centre, Coord a_Radius, FragmentFn a_FragmentFn, void* a_State );
     CONSOLEGL_API void DrawEllipseFilled( PixelBuffer* a_Buffer, Coord a_Centre, Coord a_Radius, Pixel a_Pixel );
-    CONSOLEGL_API void DrawEllipseFilledFn( PixelBuffer* a_Buffer, Coord a_Centre, Coord a_Radius, FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
-
-	CONSOLEGL_API void DrawTestImage( PixelBuffer* a_Buffer, uint32_t a_X, uint32_t a_Y, uint32_t a_Width, uint32_t a_Height, float a_Radians, uint32_t a_SourceWidth, uint32_t a_SourceHeight, const Colour* a_Source );
+    CONSOLEGL_API void DrawEllipseFilledFn( PixelBuffer* a_Buffer, Coord a_Centre, Coord a_Radius, FragmentFn a_FragmentFn, void* a_State );
 
 #pragma endregion
 
 #pragma region Rendering functions
 
-
+	CONSOLEGL_API ShaderHandle CreateShader( EShaderType a_ShaderType );
+	CONSOLEGL_API bool SetShaderSourceFromFile( ShaderHandle a_Shader, const char* a_File );
+	CONSOLEGL_API bool SetShaderSourceFromString( ShaderHandle a_Shader, const char* a_Source, size_t a_Size );
+	CONSOLEGL_API bool SetShaderBinaryFromFile( ShaderHandle a_Shader, const char* a_File );
+	CONSOLEGL_API bool SetShaderBinaryFromMemory( ShaderHandle a_Shader, const void* a_Buffer, size_t a_Size );
+	CONSOLEGL_API bool CompileShader( ShaderHandle a_Shader );
+	CONSOLEGL_API bool IsShaderCompiled( ShaderHandle a_Shader );
+	CONSOLEGL_API const char* GetShaderInfoLog();
+	CONSOLEGL_API size_t GetShaderInfoLogLength();
+	//CONSOLEGL_API void GetShaderIV( ShaderHandle a_ShaderHandle, ShaderInfo a_ShaderInfo, void* a_Value );
+	CONSOLEGL_API ShaderProgramHandle CreateShaderProgram();
+	CONSOLEGL_API bool AttachShader( ShaderProgramHandle a_ShaderProgram, ShaderHandle a_Shader );
+	CONSOLEGL_API bool LinkProgram( ShaderProgramHandle a_ShaderProgram );
+	CONSOLEGL_API size_t GetAttachedShaderCount( ShaderProgramHandle a_ShaderProgram );
+	CONSOLEGL_API bool GetAttachedShaders( ShaderProgramHandle a_ShaderProgram, ShaderHandle* a_Shaders );
+	//CONSOLEGL_API void GetProgramIV( ShaderProgramHandle a_ShaderProgramHandle, ShaderInfo a_ShaderInfo, void* a_Value );
+	//CONSOLEGL_API void GetProgramInfoLog( ShaderProgramHandle a_ShaderProgramHandle, size_t a_BufferSize, size_t* a_Length, char* a_InfoLog );
+	CONSOLEGL_API bool DetachShader( ShaderProgramHandle a_ShaderProgram, ShaderHandle a_Shader );
+	CONSOLEGL_API bool DetachShaderByType( ShaderProgramHandle a_ShaderProgram, EShaderType a_ShaderType );
+	CONSOLEGL_API bool DeleteShader( ShaderHandle a_Shader );
+	CONSOLEGL_API bool DeleteProgram( ShaderProgramHandle a_ShaderProgram );
+	//CONSOLEGL_API void Init();
+	//CONSOLEGL_API void GenBuffers( uint32_t a_Count, BufferHandle* a_Handles );
+	//CONSOLEGL_API void BindBuffer( BufferTarget a_BufferBindingTarget, BufferHandle a_Handle );
+	//CONSOLEGL_API void DeleteBuffers( uint32_t a_Count, BufferHandle* a_Handles );
+	//CONSOLEGL_API bool IsBuffer( BufferHandle a_Handle );
+	//CONSOLEGL_API bool ViewPort( size_t a_X, size_t a_Y, size_t a_Width, size_t a_Height );
+	//CONSOLEGL_API void UseProgram( ShaderProgramHandle a_ShaderProgramHandle );
+	//CONSOLEGL_API void Clear( uint8_t a_Flags );
+	//CONSOLEGL_API void ClearColour( float a_R, float a_G, float a_B, float a_A );
+	//CONSOLEGL_API void ClearDepth( float a_ClearDepth );
+	//CONSOLEGL_API void DrawArrays( RenderMode a_Mode, uint32_t a_Begin, uint32_t a_Count );
+	//CONSOLEGL_API void BufferData( BufferTarget a_BufferTarget, size_t a_Size, const void* a_Data, DataUsage a_DataUsage );
+	//CONSOLEGL_API void NamedBufferData( BufferHandle a_Handle, size_t a_Size, const void* a_Data, DataUsage a_DataUsage );
+	//CONSOLEGL_API void GenVertexArrays( uint32_t a_Count, ArrayHandle* a_Handles );
+	//CONSOLEGL_API void BindVertexArray( ArrayHandle a_Handle );
+	//CONSOLEGL_API void DeleteVertexArrays( uint32_t a_Count, ArrayHandle* a_Handles );
+	//CONSOLEGL_API void EnableVertexAttribArray( uint32_t a_Position );
+	//CONSOLEGL_API void DisableVertexAttribArray( uint32_t a_Position );
+	//CONSOLEGL_API void VertexAttribPointer( uint32_t a_Index, uint32_t a_Size, DataType a_DataType, bool a_Normalized, size_t a_Stride, void* a_Offset );
+	//CONSOLEGL_API void DrawElements( RenderMode a_Mode, uint32_t a_Count, DataType a_DataType, const void* a_Indices );
+	//CONSOLEGL_API void Enable( RenderSetting a_RenderSetting );
+	//CONSOLEGL_API void Disable( RenderSetting a_RenderSetting );
+	//CONSOLEGL_API void CullFace( CullFaceMode a_CullFace );
+	//CONSOLEGL_API void DepthFunc( TextureSetting a_TextureSetting );
+	//CONSOLEGL_API void GetBooleanv( RenderSetting a_RenderSetting, bool* a_Value );
+	//CONSOLEGL_API void ClipPlane( const double* a_Equation );
+	//CONSOLEGL_API void ActiveTexture( uint32_t a_ActiveTexture );
+	//CONSOLEGL_API void GenTextures( size_t a_Count, TextureHandle* a_Handles );
+	//CONSOLEGL_API void BindTexture( TextureTarget a_TextureTarget, TextureHandle a_Handle );
+	//CONSOLEGL_API void TexParameterf( TextureTarget a_TextureTarget, TextureParameter a_TextureParameter, float a_Value );
+	//CONSOLEGL_API void TexParameterfv( TextureTarget a_TextureTarget, TextureParameter a_TextureParameter, const float* a_Value );
+	//CONSOLEGL_API void TexParameteri( TextureTarget a_TextureTarget, TextureParameter a_TextureParameter, int32_t a_Value );
+	//CONSOLEGL_API void TexParameteri( TextureTarget a_TextureTarget, TextureParameter a_TextureParameter, const int32_t* a_Value );
+	//CONSOLEGL_API void TexParameterui( TextureTarget a_TextureTarget, TextureParameter a_TextureParameter, uint32_t a_Value );
+	//CONSOLEGL_API void TexParameterui( TextureTarget a_TextureTarget, TextureParameter a_TextureParameter, const uint32_t* a_Value );
+	//CONSOLEGL_API void TextureParameterf( TextureHandle a_Handle, TextureParameter a_TextureParameter, float a_Value );
+	//CONSOLEGL_API void TextureParameterfv( TextureHandle a_Handle, TextureParameter a_TextureParameter, const float* a_Value );
+	//CONSOLEGL_API void TextureParameteri( TextureHandle a_Handle, TextureParameter a_TextureParameter, int32_t a_Value );
+	//CONSOLEGL_API void TextureParameteri( TextureHandle a_Handle, TextureParameter a_TextureParameter, const int32_t* a_Value );
+	//CONSOLEGL_API void TextureParameterui( TextureHandle a_Handle, TextureParameter a_TextureParameter, uint32_t a_Value );
+	//CONSOLEGL_API void TextureParameterui( TextureHandle a_Handle, TextureParameter a_TextureParameter, const uint32_t* a_Value );
+	//CONSOLEGL_API void TexImage2D( TextureTarget a_TextureTarget, uint8_t a_MipMapLevel, TextureFormat a_InternalFormat, int32_t a_Width, int32_t a_Height, int32_t a_Border, TextureFormat a_TextureFormat, TextureSetting a_DataLayout, const void* a_Data );
+	//CONSOLEGL_API int32_t GetUniformLocation( ShaderProgramHandle a_ShaderProgramHandle, const char* a_Name );
+	//CONSOLEGL_API void Uniform1f( int32_t a_Location, float a_V0 );
+	//CONSOLEGL_API void Uniform2f( int32_t a_Location, float a_V0, float a_V1 );
+	//CONSOLEGL_API void Uniform3f( int32_t a_Location, float a_V0, float a_V1, float a_V2 );
+	//CONSOLEGL_API void Uniform4f( int32_t a_Location, float a_V0, float a_V1, float a_V2, float a_V3 );
+	//CONSOLEGL_API void Uniform1i( int32_t a_Location, int32_t a_V0 );
+	//CONSOLEGL_API void Uniform2i( int32_t a_Location, int32_t a_V0, int32_t a_V1 );
+	//CONSOLEGL_API void Uniform3i( int32_t a_Location, int32_t a_V0, int32_t a_V1, int32_t a_V2 );
+	//CONSOLEGL_API void Uniform4i( int32_t a_Location, int32_t a_V0, int32_t a_V1, int32_t a_V2, int32_t a_V3 );
+	//CONSOLEGL_API void Uniform1ui( int32_t a_Location, uint32_t a_V0 );
+	//CONSOLEGL_API void Uniform2ui( int32_t a_Location, uint32_t a_V0, uint32_t a_V1 );
+	//CONSOLEGL_API void Uniform3ui( int32_t a_Location, uint32_t a_V0, uint32_t a_V1, uint32_t a_V2 );
+	//CONSOLEGL_API void Uniform4ui( int32_t a_Location, uint32_t a_V0, uint32_t a_V1, uint32_t a_V2, uint32_t a_V3 );
+	//CONSOLEGL_API void Uniform1fv( int32_t a_Location, uint32_t a_Count, const float* a_Value );
+	//CONSOLEGL_API void Uniform2fv( int32_t a_Location, uint32_t a_Count, const float* a_Value );
+	//CONSOLEGL_API void Uniform3fv( int32_t a_Location, uint32_t a_Count, const float* a_Value );
+	//CONSOLEGL_API void Uniform4fv( int32_t a_Location, uint32_t a_Count, const float* a_Value );
+	//CONSOLEGL_API void Uniform1iv( int32_t a_Location, uint32_t a_Count, const int32_t* a_Value );
+	//CONSOLEGL_API void Uniform2iv( int32_t a_Location, uint32_t a_Count, const int32_t* a_Value );
+	//CONSOLEGL_API void Uniform3iv( int32_t a_Location, uint32_t a_Count, const int32_t* a_Value );
+	//CONSOLEGL_API void Uniform4iv( int32_t a_Location, uint32_t a_Count, const int32_t* a_Value );
+	//CONSOLEGL_API void Uniform1uiv( int32_t a_Location, uint32_t a_Count, const uint32_t* a_Value );
+	//CONSOLEGL_API void Uniform2uiv( int32_t a_Location, uint32_t a_Count, const uint32_t* a_Value );
+	//CONSOLEGL_API void Uniform3uiv( int32_t a_Location, uint32_t a_Count, const uint32_t* a_Value );
+	//CONSOLEGL_API void Uniform4uiv( int32_t a_Location, uint32_t a_Count, const uint32_t* a_Value );
+	//CONSOLEGL_API void UniformMatrix2fv( uint32_t a_Location, uint32_t a_Count, bool a_Transpose, const float* a_Value );
+	//CONSOLEGL_API void UniformMatrix3fv( uint32_t a_Location, uint32_t a_Count, bool a_Transpose, const float* a_Value );
+	//CONSOLEGL_API void UniformMatrix4fv( uint32_t a_Location, uint32_t a_Count, bool a_Transpose, const float* a_Value );
+	//CONSOLEGL_API void UniformMatrix2x3fv( uint32_t a_Location, uint32_t a_Count, bool a_Transpose, const float* a_Value );
+	//CONSOLEGL_API void UniformMatrix3x2fv( uint32_t a_Location, uint32_t a_Count, bool a_Transpose, const float* a_Value );
+	//CONSOLEGL_API void UniformMatrix2x4fv( uint32_t a_Location, uint32_t a_Count, bool a_Transpose, const float* a_Value );
+	//CONSOLEGL_API void UniformMatrix4x2fv( uint32_t a_Location, uint32_t a_Count, bool a_Transpose, const float* a_Value );
+	//CONSOLEGL_API void UniformMatrix3x4fv( uint32_t a_Location, uint32_t a_Count, bool a_Transpose, const float* a_Value );
+	//CONSOLEGL_API void UniformMatrix4x3fv( uint32_t a_Location, uint32_t a_Count, bool a_Transpose, const float* a_Value );
 
 #pragma endregion
+
+	CONSOLEGL_API void RunTest();
 }
 
 

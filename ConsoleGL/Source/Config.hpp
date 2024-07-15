@@ -43,8 +43,12 @@
 	#define IS_CONSOLE_DOCK 0
 #endif
 
-#ifndef IS_PIXEL_MAP_GENERATOR
-	#define IS_PIXEL_MAP_GENERATOR 0
+#ifndef IS_PIXEL_MAP
+	#define IS_PIXEL_MAP 0
+#endif
+
+#ifndef IS_SHADER_COMPILER
+	#define IS_SHADER_COMPILER 0
 #endif
 
 //==========================================================================

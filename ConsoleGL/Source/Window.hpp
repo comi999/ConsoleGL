@@ -1,5 +1,6 @@
 #pragma once
 
+#include <bitset>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -104,6 +105,19 @@ public:
     PixelBuffer* GetBuffer() { return &m_Buffers[ m_ActiveBuffer ]; }
     PixelBuffer* GetBuffer( const uint32_t a_Index ) { return &m_Buffers[ a_Index ]; }
     const PixelBuffer* GetBuffer( const uint32_t a_Index ) const { return &m_Buffers[ a_Index ]; }
+    bool HasFocus() const;
+
+	static bool IsKeyDown( const EKeyboardKey a_KeyboardKey );
+	static bool IsKeyUp( const EKeyboardKey a_KeyboardKey );
+	static bool IsKeyPressed( const EKeyboardKey a_KeyboardKey );
+	static bool IsKeyReleased( const EKeyboardKey a_KeyboardKey );
+	static bool IsMouseDown( const EMouseButton a_MouseButton );
+	static bool IsMouseUp( const EMouseButton a_MouseButton );
+	static bool IsMousePressed( const EMouseButton a_MouseButton );
+	static bool IsMouseReleased( const EMouseButton a_MouseButton );
+	static void GetMousePosition( float& o_X, float& o_Y );
+	static void GetMouseDelta( float& o_X, float& o_Y );
+	static void PollEvents();
 
 private:
 
@@ -112,13 +126,20 @@ private:
     Window( WindowDock& a_Dock );
     ~Window();
 
-    uint32_t                   m_Width;
-    uint32_t                   m_Height;
-    uint32_t                   m_PixelWidth;
-    uint32_t                   m_PixelHeight;
-    std::vector< PixelBuffer > m_Buffers;
-    uint32_t                   m_ActiveBuffer;
-    std::string                m_Title;
-    WindowDock*                m_Dock;
+    uint32_t					m_Width;
+    uint32_t					m_Height;
+    uint32_t					m_PixelWidth;
+    uint32_t					m_PixelHeight;
+    std::vector< PixelBuffer >	m_Buffers;
+    uint32_t					m_ActiveBuffer;
+    std::string					m_Title;
+    WindowDock*					m_Dock;
+
+	static std::bitset< 99 >	s_KeyStates;
+	static std::bitset< 3  >	s_MouseStates;
+	static float				s_MouseX;
+	static float				s_MouseY;
+	static float				s_MouseDeltaX;
+	static float				s_MouseDeltaY;
 };
 } // namespace ConsoleGL

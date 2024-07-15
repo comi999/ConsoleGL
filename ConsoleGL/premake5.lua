@@ -11,7 +11,8 @@ consolegl_dependencies_folder = "Dependencies"
 consolegl_resources_folder = "Resources"
 
 consolegl_dependencies = {
-	"glm"
+	"glm",
+	"memory_module"
 }
 
 project "ConsoleGL"

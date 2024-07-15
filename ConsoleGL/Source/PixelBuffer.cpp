@@ -72,14 +72,14 @@ void ConsoleGL::PixelBuffer::SetBuffer( const FragmentFn a_FragmentFn, void* a_F
     Pixel* Buffer = m_Pixels;
     for ( uint32_t y = 0u; y < m_Height; ++y )
         for ( uint32_t x = 0u; x < m_Width; ++x, ++Buffer )
-           *Buffer = a_FragmentFn( x, y, a_FragmentFnPayload );
+            *Buffer = a_FragmentFn( { x, y }, a_FragmentFnPayload );
 }
 
-void ConsoleGL::PixelBuffer::DrawLine( const Coord a_Begin, const Coord a_End, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
+void ConsoleGL::PixelBuffer::DrawLine( const Seg& a_Seg, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
 {
 	int32_t x, y;
-    int32_t dx = a_End.x - a_Begin.x;
-    int32_t dy = a_End.y - a_Begin.y;
+    int32_t dx = a_Seg.p1.x - a_Seg.p0.x;
+    int32_t dy = a_Seg.p1.y - a_Seg.p0.y;
     int32_t dx1 = abs( dx );
     int32_t dy1 = abs( dy );
     int32_t px = 2 * dy1 - dx1;
@@ -90,18 +90,18 @@ void ConsoleGL::PixelBuffer::DrawLine( const Coord a_Begin, const Coord a_End, c
 	{
 		if ( dx >= 0 )
         { 
-            x = a_Begin.x; 
-            y = a_Begin.y; 
-            xe = a_End.x; 
+            x = a_Seg.p0.x; 
+            y = a_Seg.p0.y; 
+            xe = a_Seg.p1.x; 
         }
 		else
 		{ 
-            x = a_End.x; 
-            y = a_End.y; 
-            xe = a_Begin.x; 
+            x = a_Seg.p1.x; 
+            y = a_Seg.p1.y; 
+            xe = a_Seg.p0.x; 
         }
 
-        SetPixel( Coord( x, y ), a_FragmentFn( x, y, a_FragmentFnPayload ) );
+        SetPixel( Coord( x, y ), a_FragmentFn( Coord( x, y ), a_FragmentFnPayload ) );
 		
 		for ( i = 0; x < xe; ++i )
 		{
@@ -125,25 +125,25 @@ void ConsoleGL::PixelBuffer::DrawLine( const Coord a_Begin, const Coord a_End, c
 				px = px + 2 * ( dy1 - dx1 );
 			}
 
-            SetPixel( Coord( x, y ), a_FragmentFn( x, y, a_FragmentFnPayload ) );
+            SetPixel( Coord( x, y ), a_FragmentFn( Coord( x, y ), a_FragmentFnPayload ) );
 		}
 	}
 	else
 	{
 		if ( dy >= 0 )
 		{ 
-            x = a_Begin.x; 
-            y = a_Begin.y; 
-            ye = a_End.y; 
+            x = a_Seg.p0.x; 
+            y = a_Seg.p0.y; 
+            ye = a_Seg.p1.y; 
         }
 		else
 		{ 
-            x = a_End.x;
-            y = a_End.y; 
-            ye = a_Begin.y; 
+            x = a_Seg.p1.x;
+            y = a_Seg.p1.y; 
+            ye = a_Seg.p0.y; 
         }
 
-        SetPixel( Coord( x, y ), a_FragmentFn( x, y, a_FragmentFnPayload ) );
+        SetPixel( Coord( x, y ), a_FragmentFn( Coord( x, y ), a_FragmentFnPayload ) );
 
 		for ( i = 0; y < ye; ++i )
 		{
@@ -167,7 +167,7 @@ void ConsoleGL::PixelBuffer::DrawLine( const Coord a_Begin, const Coord a_End, c
 				py = py + 2 * ( dx1 - dy1 );
 			}
 			
-            SetPixel( Coord( x, y ), a_FragmentFn( x, y, a_FragmentFnPayload ) );
+            SetPixel( Coord( x, y ), a_FragmentFn( Coord( x, y ), a_FragmentFnPayload ) );
 		}
 	}
 }
@@ -179,7 +179,7 @@ void ConsoleGL::PixelBuffer::DrawHorizontalLine( const Coord a_Begin, const uint
 
     for ( uint32_t y = YMin; y < YMax; ++y )
     {
-        a_FragmentFn( a_Begin.x, y, a_FragmentFnPayload );
+        a_FragmentFn( { a_Begin.x, y }, a_FragmentFnPayload );
     }
 }
 
@@ -190,29 +190,29 @@ void ConsoleGL::PixelBuffer::DrawVerticalLine( const Coord a_Begin, const uint32
 
     for ( uint32_t x = XMin; x < XMax; ++x )
     {
-        a_FragmentFn( x, a_Begin.y, a_FragmentFnPayload );
+        a_FragmentFn( { x, a_Begin.y }, a_FragmentFnPayload );
     }
 }
 
-void ConsoleGL::PixelBuffer::DrawTriangle( const Coord a_P0, const Coord a_P1, const Coord a_P2, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
+void ConsoleGL::PixelBuffer::DrawTriangle( const Tri& a_Tri, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
 {
-    DrawLine( a_P0, a_P1, a_FragmentFn, a_FragmentFnPayload );
-    DrawLine( a_P1, a_P2, a_FragmentFn, a_FragmentFnPayload );
-    DrawLine( a_P2, a_P0, a_FragmentFn, a_FragmentFnPayload );
+    DrawLine( { a_Tri.p0, a_Tri.p1 }, a_FragmentFn, a_FragmentFnPayload );
+    DrawLine( { a_Tri.p1, a_Tri.p2 }, a_FragmentFn, a_FragmentFnPayload );
+    DrawLine( { a_Tri.p2, a_Tri.p0 }, a_FragmentFn, a_FragmentFnPayload );
 }
 
-void ConsoleGL::PixelBuffer::DrawTriangleFilled( const Coord a_P0, const Coord a_P1, const Coord a_P2, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
+void ConsoleGL::PixelBuffer::DrawTriangleFilled( const Tri& a_Tri, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
 {
     // Using code from: https://web.archive.org/web/20050408192410/http://sw-shader.sourceforge.net/rasterizer.html
     // All credit goes to author.
 
     // 28.4 fixed-point coordinates
-    const int Y1 = (int)(16.0f * a_P0.y);
-    const int Y2 = (int)(16.0f * a_P1.y);
-    const int Y3 = (int)(16.0f * a_P2.y);
-    const int X1 = (int)(16.0f * a_P0.x);
-    const int X2 = (int)(16.0f * a_P1.x);
-    const int X3 = (int)(16.0f * a_P2.x);
+    const int Y1 = (int)(16.0f * a_Tri.p0.y);
+    const int Y2 = (int)(16.0f * a_Tri.p1.y);
+    const int Y3 = (int)(16.0f * a_Tri.p2.y);
+    const int X1 = (int)(16.0f * a_Tri.p0.x);
+    const int X2 = (int)(16.0f * a_Tri.p1.x);
+    const int X3 = (int)(16.0f * a_Tri.p2.x);
 
     // Deltas
     const int DX12 = X1 - X2;
@@ -265,7 +265,7 @@ void ConsoleGL::PixelBuffer::DrawTriangleFilled( const Coord a_P0, const Coord a
         {
             if(CX1 > 0 && CX2 > 0 && CX3 > 0)
             {
-                Buffer[x] = a_FragmentFn( x, y, a_FragmentFnPayload );
+                Buffer[x] = a_FragmentFn( Coord( x, y ), a_FragmentFnPayload );
             }
 
             CX1 -= FDY12;
@@ -309,8 +309,8 @@ void ConsoleGL::PixelBuffer::DrawRect( const Rect& a_Rect, FragmentFn a_Fragment
     // Draw top and bottom line.
     for ( uint32_t x = XLeft; x <= XRight; ++x )
     {
-	    Top[ x ] = a_FragmentFn( x, YTop, a_FragmentFnPayload );
-	    Bot[ x ] = a_FragmentFn( x, YBottom, a_FragmentFnPayload );
+        Top[ x ] = a_FragmentFn( { x, YTop }, a_FragmentFnPayload );
+        Bot[ x ] = a_FragmentFn( { x, YBottom }, a_FragmentFnPayload );
     }
 
     Pixel* Buffer = Top += m_Width;
@@ -318,8 +318,8 @@ void ConsoleGL::PixelBuffer::DrawRect( const Rect& a_Rect, FragmentFn a_Fragment
     // Draw left and right line.
     for ( uint32_t y = YTop + 1u; y < YBottom; ++y, Buffer += m_Width )
     {
-	    Buffer[ XLeft ] = a_FragmentFn( XLeft, y, a_FragmentFnPayload );
-	    Buffer[ XRight ] = a_FragmentFn( XRight, y, a_FragmentFnPayload );
+        Buffer[ XLeft ] = a_FragmentFn( { XLeft, y }, a_FragmentFnPayload );
+        Buffer[ XRight ] = a_FragmentFn( { XRight, y }, a_FragmentFnPayload );
     }
 }
 
@@ -347,10 +347,10 @@ void ConsoleGL::PixelBuffer::DrawRect( const Rect& a_Rect, const float a_Radians
     Rotated2 += glm::vec2{ OffsetX, OffsetY };
     Rotated3 += glm::vec2{ OffsetX, OffsetY };
 
-    DrawLine( Coord( Rotated0.x, Rotated0.y ), Coord( Rotated1.x, Rotated1.y ), a_FragmentFn, a_FragmentFnPayload );
-    DrawLine( Coord( Rotated1.x, Rotated1.y ), Coord( Rotated2.x, Rotated2.y ), a_FragmentFn, a_FragmentFnPayload );
-    DrawLine( Coord( Rotated2.x, Rotated2.y ), Coord( Rotated3.x, Rotated3.y ), a_FragmentFn, a_FragmentFnPayload );
-    DrawLine( Coord( Rotated3.x, Rotated3.y ), Coord( Rotated0.x, Rotated0.y ), a_FragmentFn, a_FragmentFnPayload );
+    DrawLine( { Coord{ ( uint32_t )Rotated0.x, ( uint32_t )Rotated0.y }, Coord{ ( uint32_t )Rotated1.x, ( uint32_t )Rotated1.y } }, a_FragmentFn, a_FragmentFnPayload );
+    DrawLine( { Coord{ ( uint32_t )Rotated1.x, ( uint32_t )Rotated1.y }, Coord{ ( uint32_t )Rotated2.x, ( uint32_t )Rotated2.y } }, a_FragmentFn, a_FragmentFnPayload );
+    DrawLine( { Coord{ ( uint32_t )Rotated2.x, ( uint32_t )Rotated2.y }, Coord{ ( uint32_t )Rotated3.x, ( uint32_t )Rotated3.y } }, a_FragmentFn, a_FragmentFnPayload );
+    DrawLine( { Coord{ ( uint32_t )Rotated3.x, ( uint32_t )Rotated3.y }, Coord{ ( uint32_t )Rotated0.x, ( uint32_t )Rotated0.y } }, a_FragmentFn, a_FragmentFnPayload );
 }
 
 void ConsoleGL::PixelBuffer::DrawRectFilled( const Rect& a_Rect, FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
@@ -364,7 +364,7 @@ void ConsoleGL::PixelBuffer::DrawRectFilled( const Rect& a_Rect, FragmentFn a_Fr
 
     for ( uint32_t y = YTop; y <= YBottom; ++y, Buffer += m_Width )
 		for ( uint32_t x = XLeft; x <= XRight; ++x )
-            Buffer[ x ] = a_FragmentFn( x, y, a_FragmentFnPayload );
+            Buffer[ x ] = a_FragmentFn( { x, y }, a_FragmentFnPayload );
 }
 
 void ConsoleGL::PixelBuffer::DrawRectFilled( const Rect& a_Rect, const float a_Radians, FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
@@ -396,8 +396,8 @@ void ConsoleGL::PixelBuffer::DrawRectFilled( const Rect& a_Rect, const float a_R
     // |        |
     // 1 ------ 2
 
-    DrawTriangleFilled( Coord( Rotated0.x, Rotated0.y ), Coord( Rotated1.x, Rotated1.y ), Coord( Rotated2.x, Rotated2.y ), a_FragmentFn, a_FragmentFnPayload );
-    DrawTriangleFilled( Coord( Rotated0.x, Rotated0.y ), Coord( Rotated2.x, Rotated2.y ), Coord( Rotated3.x, Rotated3.y ), a_FragmentFn, a_FragmentFnPayload );
+    DrawTriangleFilled( { Coord{ ( uint32_t )Rotated0.x, ( uint32_t )Rotated0.y }, Coord{ ( uint32_t )Rotated1.x, ( uint32_t )Rotated1.y }, Coord{ ( uint32_t )Rotated2.x, ( uint32_t )Rotated2.y } }, a_FragmentFn, a_FragmentFnPayload );
+    DrawTriangleFilled( { Coord{ ( uint32_t )Rotated0.x, ( uint32_t )Rotated0.y }, Coord{ ( uint32_t )Rotated2.x, ( uint32_t )Rotated2.y }, Coord{ ( uint32_t )Rotated3.x, ( uint32_t )Rotated3.y } }, a_FragmentFn, a_FragmentFnPayload );
 }
 
 void ConsoleGL::PixelBuffer::DrawCircle( const Coord a_Centre, const uint32_t a_Radius, FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
@@ -405,7 +405,7 @@ void ConsoleGL::PixelBuffer::DrawCircle( const Coord a_Centre, const uint32_t a_
     TODO("This needs work.");
     auto setPixel = [ & ]( int x, int y )
     {
-	    SetPixel( Coord( x, y ), a_FragmentFn( x, y, a_FragmentFnPayload ) );
+        SetPixel( Coord{ ( uint32_t )x, ( uint32_t )y }, a_FragmentFn( Coord( x, y ), a_FragmentFnPayload ) );
     };
 
     auto drawCircle = [ & ](int xc, int yc, int x, int y)
@@ -448,10 +448,10 @@ void ConsoleGL::PixelBuffer::DrawCircleFilled( const Coord a_Centre, const uint3
 {
     TODO( "this can be optimised to only calculate a quarter and flip coordinates for other 3 quadrants.");
 	// Scan over bounding box.
-    const uint32_t MinX = a_Centre.x - a_Radius;
-    const uint32_t MaxX = a_Centre.x + a_Radius;
-    const uint32_t MinY = a_Centre.y - a_Radius;
-    const uint32_t MaxY = a_Centre.y + a_Radius;
+    const int32_t MinX = a_Centre.x - a_Radius;
+    const int32_t MaxX = a_Centre.x + a_Radius;
+    const int32_t MinY = a_Centre.y - a_Radius;
+    const int32_t MaxY = a_Centre.y + a_Radius;
     const int32_t CentreX = a_Centre.x;
     const int32_t CentreY = a_Centre.y;
 
@@ -459,17 +459,20 @@ void ConsoleGL::PixelBuffer::DrawCircleFilled( const Coord a_Centre, const uint3
     TODO( "Is the failure to use <= here failing the calcs?" );
     for ( int32_t y = MinY; y < MaxY; ++y, Buffer += m_Width )
         for ( int32_t x = MinX; x < MaxX; ++x )
-            if ( ( x - CentreX ) * ( x - CentreX ) + ( y - CentreY ) * ( y - CentreY ) < a_Radius * a_Radius )
+            if ( ( x - CentreX ) * ( x - CentreX ) + ( y - CentreY ) * ( y - CentreY ) < ( int32_t )( a_Radius * a_Radius ) )
                 // If pixel inside radius, draw.
-                Buffer[ x ] = a_FragmentFn( x, y, a_FragmentFnPayload );
+                Buffer[ x ] = a_FragmentFn( Coord( x, y ), a_FragmentFnPayload );
 }
 
 void ConsoleGL::PixelBuffer::DrawEllipse( const Coord a_Centre, const Coord a_Radius, FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
 {
+#pragma warning( push )
+#pragma warning( disable : 4244)
+
 	TODO("This needs work.");
     auto setPixel = [ & ]( int x, int y )
     {
-	    SetPixel(Coord( x, y ), a_FragmentFn( x, y, a_FragmentFnPayload ) );
+	    SetPixel(Coord( x, y ), a_FragmentFn( Coord( x, y ), a_FragmentFnPayload ) );
     };
 
 	[&](int rx, int ry, int xc, int yc) -> void
@@ -546,16 +549,18 @@ void ConsoleGL::PixelBuffer::DrawEllipse( const Coord a_Centre, const Coord a_Ra
             }
         }
     }( a_Radius.x, a_Radius.y, a_Centre.x, a_Centre.y );
+
+#pragma warning( pop ) 
 }
 
 void ConsoleGL::PixelBuffer::DrawEllipseFilled( const Coord a_Centre, const Coord a_Radius, FragmentFn a_FragmentFn, void* a_FragmentFnPayload )
 {
     TODO( "this can be optimised to only calculate a quarter and flip coordinates for other 3 quadrants.");
 	// Scan over bounding box.
-    const uint32_t MinX = a_Centre.x - a_Radius.x;
-    const uint32_t MaxX = a_Centre.x + a_Radius.x;
-    const uint32_t MinY = a_Centre.y - a_Radius.y;
-    const uint32_t MaxY = a_Centre.y + a_Radius.y;
+    const int32_t MinX = a_Centre.x - a_Radius.x;
+    const int32_t MaxX = a_Centre.x + a_Radius.x;
+    const int32_t MinY = a_Centre.y - a_Radius.y;
+    const int32_t MaxY = a_Centre.y + a_Radius.y;
     const int32_t LDen = a_Radius.x * a_Radius.x;
     const int32_t RDen = a_Radius.y * a_Radius.y;
 
@@ -569,6 +574,18 @@ void ConsoleGL::PixelBuffer::DrawEllipseFilled( const Coord a_Centre, const Coor
 
 	        if ( RDen * LNum + LDen * RNum < LDen * RDen )
                 // If pixel inside radius, draw.
-                Buffer[ x ] = a_FragmentFn( x, y, a_FragmentFnPayload );
+                Buffer[ x ] = a_FragmentFn( Coord( x, y ), a_FragmentFnPayload );
         }
+}
+
+
+void ConsoleGL::PixelBuffer::DrawOnto( PixelBuffer* a_Buffer, const Coord a_Origin )
+{
+	Pixel* Destination = a_Buffer->m_Pixels + a_Origin.y * a_Buffer->m_Width + a_Origin.x;
+    Pixel* Source = m_Pixels;
+
+    for ( uint32_t y = 0; y < m_Height; ++y, Destination += a_Buffer->m_Width, Source += m_Width )
+    {
+	    memcpy( Destination, Source, sizeof( Pixel ) * m_Width );
+    }
 }

@@ -1,9 +1,10 @@
 #include <chrono>
 
 #include <Window.hpp>
+#include <Error.hpp>
 
 // Disable dll exported functions.
-#define NOUSER
+#define _USER32_
 #include <Windows.h>
 
 /*
@@ -110,6 +111,7 @@ ConsoleGL::WindowDock::WindowDock()
     // Create a command buffer.
     if ( !m_CommandBuffer.Create( Prefix + "_CommandBuffer", sizeof( CommandBuffer ) ) )
     {
+        Error::SetLastError( Error_WindowDockCreationFailure );
         return;
     }
 
@@ -117,6 +119,7 @@ ConsoleGL::WindowDock::WindowDock()
     if ( !m_CommandReady.Create( Prefix + "_CommandReady", true ) )
     {
         m_CommandBuffer.Clear();
+        Error::SetLastError( Error_WindowDockCreationFailure );
         return;
     }
     
@@ -125,6 +128,7 @@ ConsoleGL::WindowDock::WindowDock()
     {
         m_CommandBuffer.Clear();
         m_CommandReady.Clear();
+        Error::SetLastError( Error_WindowDockCreationFailure );
         return;
     }
 
@@ -133,6 +137,7 @@ ConsoleGL::WindowDock::WindowDock()
 	    m_CommandBuffer.Clear();
         m_CommandReady.Clear();
         m_CommandComplete.Clear();
+        Error::SetLastError( Error_WindowDockCreationFailure );
         return;
     }
 
@@ -142,7 +147,6 @@ ConsoleGL::WindowDock::WindowDock()
     ZeroMemory( &m_InternalInfo->ProcessInfo, sizeof( m_InternalInfo->ProcessInfo ) );
 
 #if IS_CONSOLEGL
-    MESSAGE("Found console dock exe array." );
     bool FailedToWriteConsoleDockExe = false;
 
     if ( !std::filesystem::exists( "ConsoleDock.exe" ) )
@@ -185,6 +189,7 @@ ConsoleGL::WindowDock::WindowDock()
         m_CommandComplete.Clear();
         m_ProcessStarted.Clear();
         m_InternalInfo.reset();
+        Error::SetLastError( Error_WindowDockCreationFailure );
         return;
     }
 
@@ -197,7 +202,10 @@ ConsoleGL::WindowDock::WindowDock()
         m_InternalInfo.reset();
 
         ENSURE_LOG( TerminateProcess( m_InternalInfo->ProcessInfo.hProcess, 1 ), "Failed to terminate console dock process." );
+        Error::SetLastError( Error_WindowDockCreationFailure );
     }
+
+	
 }
 
 ConsoleGL::WindowDock::WindowDock( WindowDock&& a_WindowDock ) noexcept
@@ -481,19 +489,19 @@ void ConsoleGL::Window::Destroy( Window* a_Window )
     WindowDock::s_WindowDocks.erase( Iter );
 }
 
-void ConsoleGL::Window::SetActive( Window* a_ConsoleWindow )
+void ConsoleGL::Window::SetActive( Window* a_Window )
 {
     if ( WindowDock::s_CurrentlyBorrowed )
     {
 	    ENSURE_LOG( WindowDock::s_CurrentlyBorrowed->Return(), "Failed to return console window." );
     }
 
-    if ( !a_ConsoleWindow )
+    if ( !a_Window )
     {
 	    return;
     }
 
-    ENSURE_LOG( a_ConsoleWindow->m_Dock->Borrow(), "Failed to borrow console window." );
+    ENSURE_LOG( a_Window->m_Dock->Borrow(), "Failed to borrow console window." );
 }
 
 ConsoleGL::Window* ConsoleGL::Window::GetActive()
@@ -512,20 +520,31 @@ void ConsoleGL::Window::SetTitle( const std::string& a_Title )
     {
 	    ENSURE_LOG( SetConsoleTitleA( a_Title.c_str() ), "Failed to set window title." );
 		Active->m_Title = a_Title;
+		
     }
+
+	Error::SetLastError( Error_NoActiveWindow );
 }
 
 void ConsoleGL::Window::SetColours( const Colour* a_Colours )
 {
-    if ( !WindowDock::s_CurrentlyBorrowed || !a_Colours )
+    if ( !WindowDock::s_CurrentlyBorrowed )
     {
+        Error::SetLastError( Error_NoActiveWindow );
         return;
+    }
+
+    if ( !a_Colours )
+    {
+        
+	    return;
     }
 
     const HANDLE StdOutputHandle = GetStdHandle( STD_OUTPUT_HANDLE );
 
     if ( StdOutputHandle == INVALID_HANDLE_VALUE )
     {
+		Error::SetLastError( Error_WindowFailure );
         return;
     }
 
@@ -549,9 +568,10 @@ void ConsoleGL::Window::SetColours( const Colour* a_Colours )
 	ENSURE_LOG( SetConsoleWindowInfo( StdOutputHandle, true, &WindowRect ), "Failed to set console window info." );
 	WindowRect = { 0, 0, ( SHORT )(  WindowDock::s_CurrentlyBorrowed->m_Docked->m_Width - 1 ), ( SHORT )(  WindowDock::s_CurrentlyBorrowed->m_Docked->m_Height - 1 ) };
 	ENSURE_LOG( SetConsoleWindowInfo( StdOutputHandle, true, &WindowRect ), "Failed to set console window info." );
+    
 }
 
-void ConsoleGL::Window::SetColours( EColourSet a_ColourSet )
+void ConsoleGL::Window::SetColours( const EColourSet a_ColourSet )
 {
     switch ( a_ColourSet )
     {
@@ -577,6 +597,7 @@ void ConsoleGL::Window::SwapBuffer()
 {
     if ( !WindowDock::s_CurrentlyBorrowed )
     {
+    	Error::SetLastError( Error_NoActiveWindow );
 	    return;
     }
 
@@ -600,12 +621,15 @@ void ConsoleGL::Window::SwapBuffer()
         { ( SHORT )Active->m_Width, ( SHORT )Active->m_Height },
         { 0, 0 },
         &WindowDock::s_CurrentlyBorrowed->m_InternalInfo->WindowRegion );
+    
+	
 }
 
 void ConsoleGL::Window::SwapBuffer( const uint32_t a_Index )
 {
 	if ( !WindowDock::s_CurrentlyBorrowed )
     {
+    	Error::SetLastError( Error_NoActiveWindow );
 	    return;
     }
 
@@ -613,3 +637,226 @@ void ConsoleGL::Window::SwapBuffer( const uint32_t a_Index )
     SwapBuffer();
 }
 
+bool ConsoleGL::Window::HasFocus() const
+{
+	return ::GetActiveWindow() == m_Dock->m_InternalInfo->WindowHandle;
+}
+
+uint8_t KeyCodes[ 99 ] = 
+{
+	0x08,
+	0x09,
+	0x0D,
+	0x10,
+	0x11,
+	0x12,
+	0x14,
+	0x1B,
+	0x20,
+	0x21,
+	0x22,
+	0x23,
+	0x24,
+	0x25,
+	0x26,
+	0x27,
+	0x28,
+	0x2C,
+	0x2D,
+	0x2E,
+	0x30,
+	0x31,
+	0x32,
+	0x33,
+	0x34,
+	0x35,
+	0x36,
+	0x37,
+	0x38,
+	0x39,
+	0x41,
+	0x42,
+	0x43,
+	0x44,
+	0x45,
+	0x46,
+	0x47,
+	0x48,
+	0x49,
+	0x4A,
+	0x4B,
+	0x4C,
+	0x4D,
+	0x4E,
+	0x4F,
+	0x50,
+	0x51,
+	0x52,
+	0x53,
+	0x54,
+	0x55,
+	0x56,
+	0x57,
+	0x58,
+	0x59,
+	0x5A,
+	0x70,
+	0x71,
+	0x72,
+	0x73,
+	0x74,
+	0x75,
+	0x76,
+	0x77,
+	0x78,
+	0x79,
+	0x7A,
+	0x7B,
+	0x7C,
+	0x7D,
+	0x7E,
+	0x7F,
+	0x80,
+	0x81,
+	0x82,
+	0x83,
+	0x84,
+	0x85,
+	0x86,
+	0x87,
+	0x90,
+	0x91,
+	0xA0,
+	0xA1,
+	0xA2,
+	0xA3,
+	0xA4,
+	0xA5,
+	0xBA,
+	0xBB,
+	0xBC,
+	0xBD,
+	0xBE,
+	0xBF,
+	0xC0,
+	0xDB,
+	0xDC,
+	0xDD,
+	0xDE
+};
+
+uint8_t MouseCodes[ 3 ] =
+{
+	0x01,
+	0x02,
+	0x04
+};
+
+
+std::bitset< 99 >	ConsoleGL::Window::s_KeyStates;
+std::bitset< 3  >	ConsoleGL::Window::s_MouseStates;
+float				ConsoleGL::Window::s_MouseX;
+float				ConsoleGL::Window::s_MouseY;
+float				ConsoleGL::Window::s_MouseDeltaX;
+float				ConsoleGL::Window::s_MouseDeltaY;
+
+bool ConsoleGL::Window::IsKeyDown( const EKeyboardKey a_KeyboardKey )
+{
+	return GetKeyState( KeyCodes[ static_cast< uint8_t >( a_KeyboardKey ) ] ) & 0x8000;
+}
+
+bool ConsoleGL::Window::IsKeyUp( const EKeyboardKey a_KeyboardKey )
+{
+	return !( GetKeyState( KeyCodes[ static_cast< uint8_t >( a_KeyboardKey ) ] ) & 0x8000 );
+}
+
+bool ConsoleGL::Window::IsKeyPressed( const EKeyboardKey a_KeyboardKey )
+{
+	return !s_KeyStates[ static_cast< uint8_t >( a_KeyboardKey ) ] && IsKeyDown( a_KeyboardKey );
+}
+
+bool ConsoleGL::Window::IsKeyReleased( const EKeyboardKey a_KeyboardKey )
+{
+	return s_KeyStates[ static_cast< uint8_t >( a_KeyboardKey ) ] && IsKeyUp( a_KeyboardKey );
+}
+
+bool ConsoleGL::Window::IsMouseDown( const EMouseButton a_MouseButton )
+{
+	return GetKeyState( MouseCodes[ static_cast< uint8_t >( a_MouseButton ) ] ) & 0x8000;
+}
+
+bool ConsoleGL::Window::IsMouseUp( const EMouseButton a_MouseButton )
+{
+	return !( GetKeyState( MouseCodes[ static_cast< uint8_t >( a_MouseButton ) ] ) & 0x8000 );
+}
+
+bool ConsoleGL::Window::IsMousePressed( const EMouseButton a_MouseButton )
+{
+	return !s_MouseStates[ static_cast< uint8_t >( a_MouseButton ) ] && IsMouseDown( a_MouseButton );
+}
+
+bool ConsoleGL::Window::IsMouseReleased( const EMouseButton a_MouseButton )
+{
+	return s_MouseStates[ static_cast< uint8_t >( a_MouseButton ) ] && IsMouseUp( a_MouseButton );
+}
+
+void ConsoleGL::Window::GetMousePosition( float& o_X, float& o_Y )
+{
+	o_X = s_MouseX;
+	o_Y = s_MouseY;
+}
+
+void ConsoleGL::Window::GetMouseDelta( float& o_X, float& o_Y )
+{
+	o_X = s_MouseDeltaX;
+	o_Y = s_MouseDeltaY;
+}
+
+void ConsoleGL::Window::PollEvents()
+{
+	const Window* Active = GetActive();
+
+    if ( !Active )
+    {
+	    Error::SetLastError( Error_NoActiveWindow );
+        return;
+    }
+
+	for ( size_t i = 0u; i < s_KeyStates.size(); ++i )
+	{
+		s_KeyStates[ i ] = GetKeyState( KeyCodes[ i ] ) & 0x8000;
+	}
+
+	for ( size_t i = 0u; i < s_MouseStates.size(); ++i )
+	{
+		s_MouseStates[ i ] = GetKeyState( MouseCodes[ i ] ) & 0x8000;
+	}
+
+    // Get the current mouse position.
+    POINT Coordinates{ 0, 0 };
+
+	if ( !GetCursorPos( &Coordinates ) || !ScreenToClient( Active->m_Dock->m_InternalInfo->WindowHandle, &Coordinates ) )
+	{
+		s_MouseX = 0.0f;
+		s_MouseY = 0.0f;
+        s_MouseDeltaX = 0.0f;
+        s_MouseDeltaY = 0.0f;
+	    Error::SetLastError( Error_WindowFailure );
+		return;
+	}
+
+    float NormalizedX = ( float )Coordinates.x;
+	float NormalizedY = ( float )Coordinates.y;
+
+    // Normalize coordinates.
+    NormalizedX /= Active->m_Width * Active->m_PixelWidth;
+    NormalizedY /= Active->m_Height * Active->m_PixelHeight;
+
+    // Set delta.
+    s_MouseDeltaX = NormalizedX - s_MouseX;
+    s_MouseDeltaY = NormalizedY - s_MouseY;
+
+    // Set new position.
+    s_MouseX = NormalizedX;
+    s_MouseY = NormalizedY;
+}

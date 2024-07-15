@@ -9,7 +9,8 @@ intermediate_folder = "../Generated/Intermediate"
 project_folder = "../Generated/Project"
 
 consolegl_dependencies = {
-	"glm"
+	"glm",
+	"memory_module"
 }
 
 project "ConsoleGL-ConsoleDock"

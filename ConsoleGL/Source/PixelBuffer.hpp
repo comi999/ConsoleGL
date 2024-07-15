@@ -3,7 +3,7 @@
 
 namespace ConsoleGL
 {
-#define IN_PLACE_PIXEL +[]( uint32_t, uint32_t, void* a_FragmentFnPayload ) { return *( const Pixel* )a_FragmentFnPayload; }, const_cast< Pixel* >( &a_Pixel )
+#define IN_PLACE_PIXEL +[]( const Coord a_Coord, void* a_Stage ) { return *( const Pixel* )a_Stage; }, const_cast< Pixel* >( &a_Pixel )
 
 class PixelBuffer
 {
@@ -33,8 +33,8 @@ public:
     void SetBuffer( const Pixel a_Pixel ) { SetPixels( 0u, GetSize(), a_Pixel ); }
     void SetBuffer( const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
 
-    void DrawLine( const Coord a_Begin, const Coord a_End, const Pixel a_Pixel ) { DrawLine( a_Begin, a_End, IN_PLACE_PIXEL ); }
-    void DrawLine( const Coord a_Begin, const Coord a_End, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+    void DrawLine( const Seg& a_Seg, const Pixel a_Pixel ) { DrawLine( a_Seg, IN_PLACE_PIXEL ); }
+    void DrawLine( const Seg& a_Seg, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
 
     void DrawHorizontalLine( const Coord a_Begin, const uint32_t a_Length, const Pixel a_Pixel ) { SetPixels( a_Begin, a_Length, a_Pixel ); }
     void DrawHorizontalLine( const Coord a_Begin, const uint32_t a_Length, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
@@ -42,11 +42,11 @@ public:
     void DrawVerticalLine( const Coord a_Begin, const uint32_t a_Length, const Pixel a_Pixel ) { DrawVerticalLine( a_Begin, a_Length, IN_PLACE_PIXEL ); }
     void DrawVerticalLine( const Coord a_Begin, const uint32_t a_Length, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
 
-    void DrawTriangle( const Coord a_P0, const Coord a_P1, const Coord a_P2, const Pixel a_Pixel ) { DrawTriangle( a_P0, a_P1, a_P2, IN_PLACE_PIXEL ); }
-    void DrawTriangle( const Coord a_P0, const Coord a_P1, const Coord a_P2, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+    void DrawTriangle( const Tri& a_Tri, const Pixel a_Pixel ) { DrawTriangle( a_Tri, IN_PLACE_PIXEL ); }
+    void DrawTriangle( const Tri& a_Tri, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
     
-    void DrawTriangleFilled( const Coord a_P0, const Coord a_P1, const Coord a_P2, const Pixel a_Pixel ) { DrawTriangleFilled( a_P0, a_P1, a_P2, IN_PLACE_PIXEL ); }
-    void DrawTriangleFilled( const Coord a_P0, const Coord a_P1, const Coord a_P2, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
+    void DrawTriangleFilled( const Tri& a_Tri, const Pixel a_Pixel ) { DrawTriangleFilled( a_Tri, IN_PLACE_PIXEL ); }
+    void DrawTriangleFilled( const Tri& a_Tri, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
 
     void DrawRect( const Rect& a_Rect, const Pixel a_Pixel ) { DrawRect( a_Rect, IN_PLACE_PIXEL ); }
     void DrawRect( const Rect& a_Rect, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
@@ -71,9 +71,10 @@ public:
     void DrawEllipseFilled( const Coord a_Centre, const Coord a_Radius, const FragmentFn a_FragmentFn, void* a_FragmentFnPayload );
 
     // Text operations
+    //...
 
     // Mapping functions
-   void DrawOnto( PixelBuffer* a_Buffer, const uint32_t a_OffsetX, const uint32_t a_OffsetY, const uint32_t a_Width, const uint32_t a_Height );
+   void DrawOnto( PixelBuffer* a_Buffer, const Coord a_Origin );
     
 private:
 

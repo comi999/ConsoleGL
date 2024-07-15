@@ -10,7 +10,8 @@ intermediate_folder = "../Generated/Intermediate"
 project_folder = "../Generated/Project"
 
 consolegl_dependencies = {
-	"glm"
+	"glm",
+	"memory_module",
 }
 
 project "ConsoleGL-Static"
@@ -20,12 +21,13 @@ project "ConsoleGL-Static"
 	cppdialect "C++20"
 	
 	links { "ConsoleGL" }
-	dependson { "ConsoleGL", "ConsoleGL-PixelMap", "ConsoleGL-ConsoleDock" }
+	dependson { "ConsoleGL", "ConsoleGL-PixelMap", "ConsoleGL-ConsoleDock", "ConsoleGL-ShaderCompiler" }
 	includedirs { consolegl_source_folder, "." }
 	forceincludes { path.join(consolegl_source_folder, "Common.hpp") }
 	add_dependencies(consolegl_dependencies_folder, consolegl_dependencies, true)
 	includedirs { "$(SolutionDir)Generated/Code/%{cfg.buildcfg}/Win64/ConsoleGL-PixelMap" }
 	includedirs { "$(SolutionDir)Generated/Code/%{cfg.buildcfg}/Win64/ConsoleGL-ConsoleDock" }
+	includedirs { "$(SolutionDir)Generated/Code/%{cfg.buildcfg}/Win64/ConsoleGL-ShaderCompiler" }
 	
     files {
 		path.join("**.c"),

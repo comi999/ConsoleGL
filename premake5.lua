@@ -25,6 +25,7 @@ workspace "ConsoleGL"
 include "ConsoleGL"
 include "ConsoleGL-ConsoleDock"
 include "ConsoleGL-PixelMap"
+include "ConsoleGL-ShaderCompiler"
 include "ConsoleGL-Static"
 include "ConsoleGL-Shared"
 
