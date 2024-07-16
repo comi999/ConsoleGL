@@ -438,6 +438,7 @@ struct LayoutInfo
 {
 	Field* Fields;
 	size_t FieldCount;
+	size_t Size;
 };
 
 )";
@@ -460,6 +461,7 @@ struct LayoutInfo
 	Result += "\tstatic LayoutInfo Info;\n";
 	Result += "\tInfo.Fields = Fields;\n";
 	Result += "\tInfo.FieldCount = " + std::to_string( a_Input.size() ) + ";\n";
+	Result += "\tInfo.Size = sizeof(Layout);\n";
 
 	Result += "\treturn &Info;\n";
 	Result += "}\n";
@@ -534,11 +536,17 @@ bool ProcessSource( const std::string& a_Input, std::string& o_Output )
 		return false;
 	}
 
+	std::string DeclspecInput = a_Input;
+    const std::regex RunDeclaration( R"(\bvoid\s+run\b)" );
+    const std::string DeclspecRunDeclaration = R"(extern "C" __declspec(dllexport) void run)";
+
+    DeclspecInput = std::regex_replace( DeclspecInput, RunDeclaration, DeclspecRunDeclaration );
+
     o_Output = 
 		"#include <cstdint>\n"
 		"#include <cstddef>\n"
 		"#include <glm.hpp>\n\n"
-	+ CreateTypedefs() + a_Input + CreateInfoFunction( ProcessedFields );
+	+ CreateTypedefs() + DeclspecInput + CreateInfoFunction( ProcessedFields );
 
 	return true;
 }

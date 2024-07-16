@@ -4,11 +4,13 @@
 #include <fstream>
 #include <chrono>
 #include <filesystem>
-
+#include <bitset>
 
 #include <ConsoleGL.hpp>
 #include <Error.hpp>
-#include <Window.hpp>
+#include <Event.hpp>
+#include <FileMap.hpp>
+#include <PixelBuffer.hpp>
 
 #include <memory_module/MemoryModule.hpp>
 
@@ -19,7 +21,7 @@
 #undef CreateWindow
 
 #if IS_CONSOLEGL
-//#include <WindowDock.inl>
+#include <ConsoleDock.inl>
 #include <PixelMap.inl>
 #include <ShaderCompiler.inl>
 #endif
@@ -150,6 +152,64 @@ private: \
 
 namespace ConsoleGL
 {
+	enum class EWindowDockCommand
+	{
+	    Release,
+	    Attach,
+	    Terminate
+	};
+	
+	struct WindowDockCommandBuffer
+	{
+	    EWindowDockCommand Command;
+	    uint32_t Value;
+	};
+	
+	struct InternalInfo
+	{
+	    HWND                WindowHandle;
+	    SMALL_RECT          WindowRegion;
+	    STARTUPINFOA        StartupInfo;
+	    PROCESS_INFORMATION ProcessInfo;
+	};
+
+	struct Window
+	{
+		static bool IsKeyDown( const EKeyboardKey a_KeyboardKey );
+		static bool IsKeyUp( const EKeyboardKey a_KeyboardKey );
+		static bool IsKeyPressed( const EKeyboardKey a_KeyboardKey );
+		static bool IsKeyReleased( const EKeyboardKey a_KeyboardKey );
+		static bool IsMouseDown( const EMouseButton a_MouseButton );
+		static bool IsMouseUp( const EMouseButton a_MouseButton );
+		static bool IsMousePressed( const EMouseButton a_MouseButton );
+		static bool IsMouseReleased( const EMouseButton a_MouseButton );
+		static void GetMousePosition( float& o_X, float& o_Y );
+		static void GetMouseDelta( float& o_X, float& o_Y );
+		static void PollEvents();
+
+
+
+	    uint32_t					    Width;
+	    uint32_t					    Height;
+	    uint32_t					    PixelWidth;
+	    uint32_t					    PixelHeight;
+	    std::vector< PixelBuffer >	    Buffers;
+	    uint32_t					    ActiveBuffer;
+	    std::string					    Title;
+		std::shared_ptr< InternalInfo > InternalInfo;
+	    FileMap                         CommandBuffer;
+		Event                           CommandReady;
+	    Event                           CommandComplete;
+	    Event                           ProcessStarted;
+	
+		static std::bitset< 99 >	s_KeyStates;
+		static std::bitset< 3  >	s_MouseStates;
+		static float				s_MouseX;
+		static float				s_MouseY;
+		static float				s_MouseDeltaX;
+		static float				s_MouseDeltaY;
+	};
+
 	struct Context
 	{
 		ShaderProgramHandle	ActiveShaderProgram;
@@ -164,14 +224,35 @@ namespace ConsoleGL
 		MemoryCompiled
 	};
 
+	struct ShaderLayout;
+
+	struct ShaderField
+	{
+		const char* Name;
+		uint64_t	Offset;
+		uint64_t	Size;
+		uint16_t	DataType;
+		uint16_t	IOType;
+		uint16_t	BuiltinVar;
+		uint16_t	Slot;
+	};
+	
+	struct ShaderLayoutInfo
+	{
+		ShaderField*	Fields;
+		size_t			FieldCount;
+		size_t			Size;
+	};
+
 	struct ShaderProcInfo
 	{
-		bool IsMemoryLoaded;
-		const void* Handle;
-		const void* Entry;
-		const void* Info;
+		using RunFn		= void( * )( ShaderLayout* );
+		using InfoFn	= ShaderLayoutInfo*( * )();
 
-		// .. Here will be where all the reflection info will be created from ShaderCompiler.exe
+		bool		IsMemoryLoaded;
+		const void* Handle;
+		RunFn		Run;
+		InfoFn		Info;
 	};
 
 	struct Shader
@@ -200,14 +281,14 @@ namespace ConsoleGL
 	};
 }
 
-//DEFINE_REPOSITORY( Window, WINDOW_MAX_COUNT );
+DEFINE_REPOSITORY( Window, WINDOW_MAX_COUNT );
 DEFINE_REPOSITORY( Context, CONTEXT_MAX_COUNT );
 DEFINE_REPOSITORY( Shader, SHADER_MAX_COUNT );
 DEFINE_REPOSITORY( ShaderProgram, SHADER_PROGRAM_MAX_COUNT );
 
 struct
 {
-	//WindowRepository				Windows;
+	WindowRepository				Windows;
 	ContextRepository				Contexts;
 	ShaderRepository				Shaders;
 	ShaderProgramRepository			ShaderPrograms;
@@ -217,84 +298,556 @@ struct
 
 #pragma region Window functions
 
+bool ReturnWindow( const ConsoleGL::WindowHandle a_Window )
+{
+	if ( State.ActiveWindow != a_Window )
+    {
+	    return true;
+    }
+
+    ConsoleGL::WindowDockCommandBuffer* Buffer = ( ConsoleGL::WindowDockCommandBuffer* )a_Window->CommandBuffer.Data();
+    Buffer->Command = ConsoleGL::EWindowDockCommand::Attach;
+    Buffer->Value = ( uint32_t )GetCurrentProcessId();
+
+    ENSURE_LOG( !( !a_Window->CommandReady.Trigger() || !a_Window->CommandComplete.Wait() ), "Failed to trigger console dock attach." );
+    ENSURE_LOG( FreeConsole(), "Failed to free console window." );
+
+    State.ActiveWindow = nullptr;
+
+    return true;
+}
+
+bool BorrowWindow( const ConsoleGL::WindowHandle a_Window )
+{
+	if ( State.ActiveWindow == a_Window )
+    {
+	    return true;
+    }
+
+    ENSURE_LOG( !( State.ActiveWindow && !ReturnWindow( State.ActiveWindow ) ), "Failed to return currently borrowed console window." );
+	ENSURE_LOG( AttachConsole( a_Window->InternalInfo->ProcessInfo.dwProcessId ), "Failed to attach console window." );
+
+    // Set command.
+    ConsoleGL::WindowDockCommandBuffer* Buffer = ( ConsoleGL::WindowDockCommandBuffer* )a_Window->CommandBuffer.Data();
+    Buffer->Command = ConsoleGL::EWindowDockCommand::Release;
+    
+    ENSURE_LOG( a_Window->CommandReady.Trigger(), "Failed to trigger console dock release." );
+    ENSURE_LOG( a_Window->CommandComplete.Wait(), "Failed to wait for console dock release." );
+    
+    State.ActiveWindow = a_Window;
+    return true;
+}
+
+
 ConsoleGL::Window* ConsoleGL::CreateWindow( const char* a_Title, const uint32_t a_Width, const uint32_t a_Height, const uint32_t a_PixelWidth, const uint32_t a_PixelHeight, const uint32_t a_BufferCount )
 {
-	return Window::Create( a_Title, a_Width, a_Height, a_PixelWidth, a_PixelHeight, a_BufferCount );
+#if IS_CONSOLEGL
+	Window* Created = State.Windows.Create();
+
+	if ( !Created )
+	{
+		return nullptr;
+	}
+
+	const std::string Prefix = std::to_string( std::chrono::high_resolution_clock::now().time_since_epoch().count() );
+
+    // Create a command buffer.
+    if ( !Created->CommandBuffer.Create( Prefix + "_CommandBuffer", sizeof( Created->CommandBuffer ) ) )
+    {
+		State.Windows.Destroy( Created );
+        Error::SetLastError( Error_WindowDockCreationFailure );
+        return nullptr;
+    }
+
+    // Create the command ready event.
+    if ( !Created->CommandReady.Create( Prefix + "_CommandReady", true ) )
+    {
+        Created->CommandBuffer.Clear();
+		State.Windows.Destroy( Created );
+        Error::SetLastError( Error_WindowDockCreationFailure );
+        return nullptr;
+    }
+    
+    // Create the command complete event.
+    if ( !Created->CommandComplete.Create( Prefix + "_CommandComplete", true ) )
+    {
+        Created->CommandBuffer.Clear();
+        Created->CommandReady.Clear();
+		State.Windows.Destroy( Created );
+        Error::SetLastError( Error_WindowDockCreationFailure );
+        return nullptr;
+    }
+
+    if ( !Created->ProcessStarted.Create( Prefix + "_ProcessStarted" ) )
+    {
+	    Created->CommandBuffer.Clear();
+        Created->CommandReady.Clear();
+        Created->CommandComplete.Clear();
+		State.Windows.Destroy( Created );
+        Error::SetLastError( Error_WindowDockCreationFailure );
+        return nullptr;
+    }
+
+    Created->InternalInfo = std::make_shared< InternalInfo >();
+    ZeroMemory( &Created->InternalInfo->StartupInfo, sizeof( Created->InternalInfo->StartupInfo ) );
+    Created->InternalInfo->StartupInfo.cb = sizeof( Created->InternalInfo->StartupInfo );
+    ZeroMemory( &Created->InternalInfo->ProcessInfo, sizeof( Created->InternalInfo->ProcessInfo ) );
+
+    bool FailedToWriteConsoleDockExe = false;
+
+    if ( !std::filesystem::exists( "ConsoleDock.exe" ) )
+    {
+    	std::ofstream ConsoleDockExe( "ConsoleDock.exe", std::ios::binary | std::ios::out );
+
+        if ( !ConsoleDockExe.is_open() )
+	    {
+		    FailedToWriteConsoleDockExe = true;
+	    }
+        else
+        {
+	        ConsoleDockExe.write( ( const char* )ConsoleDock, sizeof( ConsoleDock ) );
+        }
+    }
+	if (
+        FailedToWriteConsoleDockExe ||
+        !CreateProcessA(
+        nullptr,
+        ( "ConsoleDock.exe " + Prefix ).data(),
+        nullptr,
+        nullptr,
+        true,
+        CREATE_NEW_CONSOLE,
+        nullptr,
+        nullptr,
+        &Created->InternalInfo->StartupInfo,
+        &Created->InternalInfo->ProcessInfo ) )
+
+    {
+	    Created->CommandBuffer.Clear();
+        Created->CommandReady.Clear();
+        Created->CommandComplete.Clear();
+        Created->ProcessStarted.Clear();
+        Created->InternalInfo.reset();
+		State.Windows.Destroy( Created );
+        Error::SetLastError( Error_WindowDockCreationFailure );
+        return nullptr;
+    }
+
+    if ( !Created->ProcessStarted.Wait() )
+    {
+	    Created->CommandBuffer.Clear();
+        Created->CommandReady.Clear();
+        Created->CommandComplete.Clear();
+        Created->ProcessStarted.Clear();
+        Created->InternalInfo.reset();
+
+        ENSURE_LOG( TerminateProcess( Created->InternalInfo->ProcessInfo.hProcess, 1 ), "Failed to terminate console dock process." );
+		State.Windows.Destroy( Created );
+        Error::SetLastError( Error_WindowDockCreationFailure );
+    }
+
+    // Temporarily return any currently borrowed window.
+    //const WindowDock* PreviouslyBorrowed = WindowDock::s_CurrentlyBorrowed;
+	const WindowHandle PreviouslyActive = State.ActiveWindow;
+
+    // Borrow the new docked window.
+	ENSURE_LOG( BorrowWindow( Created ), "Could not borrow window." );
+    Created->InternalInfo->WindowHandle = GetConsoleWindow();
+
+    const HANDLE StdOutputHandle = GetStdHandle( STD_OUTPUT_HANDLE );
+    const HANDLE StdInputHandle = GetStdHandle( STD_INPUT_HANDLE );
+
+    // Change console visual size to a minimum so ScreenBuffer can shrink
+	// below the actual visual size
+	SMALL_RECT WindowRect = { 0, 0, 1, 1 };
+	ENSURE_LOG( SetConsoleWindowInfo( StdOutputHandle, true, &WindowRect ), "Failed to set console window info." );
+
+    // Set the size of the screen buffer
+	ENSURE_LOG( SetConsoleScreenBufferSize( StdOutputHandle, { ( SHORT )a_Width, ( SHORT )a_Height } ), "Failed to set console screen buffer size." );
+
+    // Assign screen buffer to the console
+	ENSURE_LOG( SetConsoleActiveScreenBuffer( StdOutputHandle ), "Failed to set console screen buffer." );
+
+    // Set console font.
+    CONSOLE_FONT_INFOEX FontInfo;
+    ZeroMemory( &FontInfo, sizeof( FontInfo ) );
+    FontInfo.cbSize = sizeof( FontInfo );
+    FontInfo.nFont = 0;
+    FontInfo.dwFontSize = { ( SHORT )a_PixelWidth, ( SHORT )a_PixelHeight };
+    FontInfo.FontFamily = FF_DONTCARE;
+    FontInfo.FontWeight = FW_NORMAL;
+	wcscpy_s( FontInfo.FaceName, L"Consolas" );
+	ENSURE_LOG( SetCurrentConsoleFontEx( StdOutputHandle, false, &FontInfo ), "Failed to set console font." );
+
+    // Get screen buffer info.
+	CONSOLE_SCREEN_BUFFER_INFO ScreenBufferInfo;
+	ENSURE_LOG( GetConsoleScreenBufferInfo( StdOutputHandle, &ScreenBufferInfo ), "Failed to get console screen buffer info." );
+	ENSURE_LOG( a_Width <= ( uint32_t )ScreenBufferInfo.dwMaximumWindowSize.X, "Failed to create console window of with width %u.", a_Width );
+	ENSURE_LOG( a_Height <= ( uint32_t )ScreenBufferInfo.dwMaximumWindowSize.Y, "Failed to create console window of with height %u.", a_Height );
+
+    // Set Physical Console Window Size
+	WindowRect = { 0, 0, ( SHORT )( a_Width - 1 ), ( SHORT )( a_Height - 1 ) };
+    Created->InternalInfo->WindowRegion = WindowRect;
+	ENSURE_LOG( SetConsoleWindowInfo( StdOutputHandle, true, &WindowRect ), "Failed to set console window info." );
+    ENSURE_LOG( SetConsoleMode( StdInputHandle, ENABLE_EXTENDED_FLAGS | ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT ), "Failed to set console mode." );
+    ENSURE_LOG( SetConsoleTitleA( a_Title ), "Failed to set console title." );
+    
+    // Set window info.
+    Created->Title = a_Title;
+    Created->PixelWidth = a_PixelWidth;
+    Created->PixelHeight = a_PixelHeight;
+    Created->Width = a_Width;
+    Created->Height = a_Height;
+    Created->Buffers.reserve( a_BufferCount );
+
+    for ( uint32_t i = 0; i < a_BufferCount; ++i )
+    {
+        Created->Buffers.emplace_back( a_Width, a_Height );
+    }
+
+    // Return the new console back to its dock.
+    ENSURE_LOG( ReturnWindow( Created ), "Failed to return window." );
+
+    // If there was a previously borrowed window, re-borrow it.
+    if ( PreviouslyActive )
+    {
+        ENSURE_LOG( BorrowWindow( PreviouslyActive ), "Failed to borrow back active window." );
+    }
+
+    return Created;
+#else
+	return nullptr;
+#endif
 }
 
-void ConsoleGL::DestroyWindow( Window* a_Window )
+bool ConsoleGL::DestroyWindow( const WindowHandle a_Window )
 {
-	return Window::Destroy( a_Window );
+	return State.Windows.Destroy( a_Window );
 }
 
-void ConsoleGL::SetActiveWindow( Window* a_Window )
+bool ConsoleGL::SetActiveWindow( const WindowHandle a_Window )
 {
-	Window::SetActive( a_Window );
+	if ( a_Window && State.Windows.IsValid( a_Window ) )
+	{
+		Error::SetLastError( Error_InvalidWindowHandle );
+		return false;
+	}
+
+	if ( State.ActiveWindow && !ReturnWindow( State.ActiveWindow ) )
+    {
+		Error::SetLastError( Error_WindowReturnFailure );
+	    return false;
+    }
+
+    if ( a_Window && !BorrowWindow( a_Window ) )
+    {
+		Error::SetLastError( Error_WindowBorrowFailure );
+	    return false;
+    }
+
+    return true;
 }
 
 ConsoleGL::Window* ConsoleGL::GetActiveWindow()
 {
-	return Window::GetActive();
+	return State.ActiveWindow;
 }
 
-void ConsoleGL::SetWindowTitle( const char* a_Title )
+bool ConsoleGL::SetWindowTitle( const char* a_Title )
 {
-	Window::SetTitle( a_Title );
+	if ( !State.ActiveWindow )
+	{
+		Error::SetLastError( Error_NoActiveWindow );
+		return false;
+	}
+
+	if ( !SetConsoleTitleA( a_Title ) )
+	{
+		Error::SetLastError( Error_WindowSetTitleFailure );
+		return false;
+	}
+
+	State.ActiveWindow->Title = a_Title;
+	return true;
+
 }
 
-void ConsoleGL::SetWindowColoursFromArray( const Colour* a_Colours )
+bool ConsoleGL::SetWindowColoursFromArray( const Colour* a_Colours )
 {
-	Window::SetColours( a_Colours );
+	if ( !State.ActiveWindow )
+    {
+        Error::SetLastError( Error_NoActiveWindow );
+        return false;
+    }
+
+    const HANDLE StdOutputHandle = GetStdHandle( STD_OUTPUT_HANDLE );
+
+    if ( StdOutputHandle == INVALID_HANDLE_VALUE )
+    {
+		Error::SetLastError( Error_GenericWindowFailure );
+        return false;
+    }
+
+    CONSOLE_SCREEN_BUFFER_INFOEX ScreenBufferInfo;
+    ScreenBufferInfo.cbSize = sizeof( ScreenBufferInfo );
+    ENSURE_LOG( GetConsoleScreenBufferInfoEx( StdOutputHandle, &ScreenBufferInfo ), "Failed to get console window screen buffer info." );
+
+	// Set to all black if nullptr
+    if ( !a_Colours )
+    {
+	    for ( uint8_t i = 0u; i < 16u; ++i )
+		{
+		    ScreenBufferInfo.ColorTable[ i ] = 0u;
+		}
+    }
+	else
+	{
+		for ( uint8_t i = 0u; i < 16u; ++i )
+		{
+		    ScreenBufferInfo.ColorTable[ i ] =
+		        ( static_cast< DWORD >( a_Colours[ i ].b ) << 16 ) |
+		        ( static_cast< DWORD >( a_Colours[ i ].g ) << 8  ) |
+		        ( static_cast< DWORD >( a_Colours[ i ].r )       ) ;
+		}
+	}
+
+    // Set the screen buffer info.
+    ENSURE_LOG( SetConsoleScreenBufferInfoEx( StdOutputHandle, &ScreenBufferInfo ), "Failed to set console window screen buffer info." );
+
+    // Due to weirdness with console windows, we need to set the rect to 1x1 and then back to full size again to get rid of scrollbars caused by the above call.
+	SMALL_RECT WindowRect = { 0, 0, 1, 1 };
+	ENSURE_LOG( SetConsoleWindowInfo( StdOutputHandle, true, &WindowRect ), "Failed to set console window info." );
+	WindowRect = { 0, 0, ( SHORT )( State.ActiveWindow->Width - 1 ), ( SHORT )( State.ActiveWindow->Height - 1 ) };
+	ENSURE_LOG( SetConsoleWindowInfo( StdOutputHandle, true, &WindowRect ), "Failed to set console window info." );
+
+	return true;
 }
 
-void ConsoleGL::SetWindowColoursFromSet( const EColourSet a_ColourSet )
+bool ConsoleGL::SetWindowColoursFromSet( const EColourSet a_ColourSet )
 {
-	Window::SetColours( a_ColourSet );
+	const Colour* Colours = nullptr;
+
+	switch ( a_ColourSet )
+    {
+    case EColourSet::DEFAULT:
+    {
+    	static constexpr Colour Default[ 16 ] =
+		{
+		    { 0,   0,   0   },
+		    { 255, 0,   0   },
+		    { 0,   255, 0   },
+		    { 0,   0,   255 },
+		    { 255, 255, 0   },
+		    { 255, 0,   255 },
+		    { 0,   255, 255 },
+		    { 255, 255, 255 },
+		    { 85,  85,  85  },
+		    { 170, 85,  85  },
+		    { 85,  170, 85  },
+		    { 85,  85,  170 },
+		    { 170, 170, 85  },
+		    { 170, 85,  170 },
+		    { 85,  170, 170 },
+		    { 170, 170, 170 }
+		};
+
+        Colours = Default;
+        break;
+    }
+    case EColourSet::GREYSCALE:
+    {
+		static constexpr Colour Greyscale[ 16 ] =
+		{
+			{ 0,   0,   0   },
+			{ 76,  76,  76  },
+			{ 149, 149, 149 },
+			{ 29,  29,  29  },
+			{ 225, 225, 225 },
+			{ 105, 105, 105 },
+			{ 178, 178, 178 },
+			{ 254, 254, 254 },
+			{ 83,  83,  83  },
+			{ 108, 108, 108 },
+			{ 133, 133, 133 },
+			{ 93,  93,  93  },
+			{ 158, 158, 158 },
+			{ 118, 118, 118 },
+			{ 143, 143, 143 },
+			{ 168, 168, 168 }
+		};
+		
+        Colours = Greyscale;
+        break;
+    }
+    case EColourSet::SEPIA:
+    {
+    	static constexpr Colour Sepia[ 16 ] =
+		{
+		    { 0,   0,   0   },
+		    { 100, 88,  69  },
+		    { 196, 174, 136 },
+		    { 48,  42,  33  },
+		    { 255, 255, 205 },
+		    { 148, 131, 102 },
+		    { 244, 217, 169 },
+		    { 255, 255, 238 },
+		    { 114, 102, 79  },
+		    { 148, 131, 102 },
+		    { 180, 160, 125 },
+		    { 130, 116, 90  },
+		    { 213, 190, 148 },
+		    { 164, 146, 113 },
+		    { 196, 174, 136 },
+		    { 229, 204, 159 }
+		};
+
+        Colours = Sepia;
+        break;
+    }
+    }
+
+	if ( !Colours )
+	{
+		Error::SetLastError( Error_WindowInvalidColourSet );
+		return false;
+	}
+
+	return SetWindowColoursFromArray( Colours );
 }
 
-void ConsoleGL::SwapWindowBuffer()
+bool ConsoleGL::SwapWindowBuffer()
 {
-	Window::SwapBuffer();
+	if ( !State.ActiveWindow )
+    {
+    	Error::SetLastError( Error_NoActiveWindow );
+	    return false;
+    }
+
+    const uint32_t IndexToDraw = State.ActiveWindow->ActiveBuffer;
+
+    if ( State.ActiveWindow->Buffers.size() > 1 )
+    {
+        ++State.ActiveWindow->ActiveBuffer;
+
+        if ( State.ActiveWindow->ActiveBuffer >= State.ActiveWindow->Buffers.size() )
+        {
+            State.ActiveWindow->ActiveBuffer = 0u;
+        }
+    }
+
+    if ( !WriteConsoleOutput(
+        GetStdHandle( STD_OUTPUT_HANDLE ),
+        ( CHAR_INFO* )State.ActiveWindow->Buffers[ IndexToDraw ].GetPixels(),
+        { ( SHORT )State.ActiveWindow->Width, ( SHORT )State.ActiveWindow->Height },
+        { 0, 0 },
+        &State.ActiveWindow->InternalInfo->WindowRegion ) )
+    {
+	    Error::SetLastError( Error_WindowBufferWriteFailure );
+		return false;
+    }
+
+	return true;
 }
 
-void ConsoleGL::SwapWindowBufferByIndex( uint32_t a_Index )
+bool ConsoleGL::SwapWindowBufferToIndex( const uint32_t a_Index )
 {
-	Window::SwapBuffer( a_Index );
+	if ( !State.ActiveWindow )
+    {
+    	Error::SetLastError( Error_NoActiveWindow );
+	    return false;
+    }
+
+	if ( a_Index >= State.ActiveWindow->Buffers.size() )
+	{
+		Error::SetLastError( Error_InvalidWindowBufferIndex );
+		return false;
+	}
+
+	State.ActiveWindow->ActiveBuffer = a_Index;
+    return SwapWindowBuffer();
 }
 
-const char* ConsoleGL::GetWindowTitle( Window* a_Window )
+const char* ConsoleGL::GetWindowTitle( const WindowHandle a_Window )
 {
-	return a_Window->GetTitle().c_str();
+	if ( !a_Window || State.Windows.IsValid( a_Window ) )
+	{
+		Error::SetLastError( Error_InvalidWindowHandle );
+		return "";
+	}
+
+	return a_Window->Title.c_str();
 }
 
-uint32_t ConsoleGL::GetWindowWidth( Window* a_Window )
+uint32_t ConsoleGL::GetWindowWidth( const WindowHandle a_Window )
 {
-	return a_Window->GetWidth();
+	if ( !a_Window || State.Windows.IsValid( a_Window ) )
+	{
+		Error::SetLastError( Error_InvalidWindowHandle );
+		return 0;
+	}
+
+	return a_Window->Width;
 }
 
-uint32_t ConsoleGL::GetWindowHeight( Window* a_Window )
+uint32_t ConsoleGL::GetWindowHeight( const WindowHandle a_Window )
 {
-	return a_Window->GetHeight();
+	if ( !a_Window || State.Windows.IsValid( a_Window ) )
+	{
+		Error::SetLastError( Error_InvalidWindowHandle );
+		return 0;
+	}
+
+	return a_Window->Width;
 }
 
-uint32_t ConsoleGL::GetWindowBufferIndex( Window* a_Window )
+uint32_t ConsoleGL::GetWindowBufferIndex( const WindowHandle a_Window )
 {
-	return a_Window->GetBufferIndex();
+	if ( !a_Window || State.Windows.IsValid( a_Window ) )
+	{
+		Error::SetLastError( Error_InvalidWindowHandle );
+		return 0;
+	}
+
+	return a_Window->ActiveBuffer;
 }
 
-uint32_t ConsoleGL::GetWindowBufferCount( Window* a_Window )
+uint32_t ConsoleGL::GetWindowBufferCount( const WindowHandle a_Window )
 {
-	return a_Window->GetBufferCount();
+	if ( !a_Window || State.Windows.IsValid( a_Window ) )
+	{
+		Error::SetLastError( Error_InvalidWindowHandle );
+		return 0;
+	}
+
+	return a_Window->Buffers.size();
 }
 
-ConsoleGL::PixelBuffer* ConsoleGL::GetWindowBuffer( Window* a_Window )
+ConsoleGL::PixelBuffer* ConsoleGL::GetWindowBuffer( const WindowHandle a_Window )
 {
-	return a_Window->GetBuffer();
+	if ( !a_Window || State.Windows.IsValid( a_Window ) )
+	{
+		Error::SetLastError( Error_InvalidWindowHandle );
+		return nullptr;
+	}
+
+	return &a_Window->Buffers[ a_Window->ActiveBuffer ];
 }
 
-ConsoleGL::PixelBuffer* ConsoleGL::GetWindowBufferByIndex( Window* a_Window, const uint32_t a_Index )
+ConsoleGL::PixelBuffer* ConsoleGL::GetWindowBufferByIndex( const WindowHandle a_Window, const uint32_t a_Index )
 {
-	return a_Window->GetBuffer( a_Index );
+	if ( !a_Window || State.Windows.IsValid( a_Window ) )
+	{
+		Error::SetLastError( Error_InvalidWindowHandle );
+		return nullptr;
+	}
+
+	if ( a_Index >= State.ActiveWindow->Buffers.size() )
+	{
+		Error::SetLastError( Error_InvalidWindowBufferIndex );
+		return nullptr;
+	}
+
+	return &a_Window->Buffers[ a_Index ];
 }
 
 #pragma endregion
@@ -332,59 +885,222 @@ ConsoleGL::Context* ConsoleGL::GetActiveContext()
 
 #pragma region Input functions
 
-bool ConsoleGL::IsKeyUp( const EKeyboardKey a_KeyboardKey )
+uint8_t KeyCodes[ 99 ] = 
 {
-	return Window::IsKeyUp( a_KeyboardKey );
-}
+	0x08,
+	0x09,
+	0x0D,
+	0x10,
+	0x11,
+	0x12,
+	0x14,
+	0x1B,
+	0x20,
+	0x21,
+	0x22,
+	0x23,
+	0x24,
+	0x25,
+	0x26,
+	0x27,
+	0x28,
+	0x2C,
+	0x2D,
+	0x2E,
+	0x30,
+	0x31,
+	0x32,
+	0x33,
+	0x34,
+	0x35,
+	0x36,
+	0x37,
+	0x38,
+	0x39,
+	0x41,
+	0x42,
+	0x43,
+	0x44,
+	0x45,
+	0x46,
+	0x47,
+	0x48,
+	0x49,
+	0x4A,
+	0x4B,
+	0x4C,
+	0x4D,
+	0x4E,
+	0x4F,
+	0x50,
+	0x51,
+	0x52,
+	0x53,
+	0x54,
+	0x55,
+	0x56,
+	0x57,
+	0x58,
+	0x59,
+	0x5A,
+	0x70,
+	0x71,
+	0x72,
+	0x73,
+	0x74,
+	0x75,
+	0x76,
+	0x77,
+	0x78,
+	0x79,
+	0x7A,
+	0x7B,
+	0x7C,
+	0x7D,
+	0x7E,
+	0x7F,
+	0x80,
+	0x81,
+	0x82,
+	0x83,
+	0x84,
+	0x85,
+	0x86,
+	0x87,
+	0x90,
+	0x91,
+	0xA0,
+	0xA1,
+	0xA2,
+	0xA3,
+	0xA4,
+	0xA5,
+	0xBA,
+	0xBB,
+	0xBC,
+	0xBD,
+	0xBE,
+	0xBF,
+	0xC0,
+	0xDB,
+	0xDC,
+	0xDD,
+	0xDE
+};
+
+uint8_t MouseCodes[ 3 ] =
+{
+	0x01,
+	0x02,
+	0x04
+};
+
+std::bitset< 99 >	KeyStates;
+std::bitset< 3  >	MouseStates;
+float				MouseX;
+float				MouseY;
+float				MouseDeltaX;
+float				MouseDeltaY;
 
 bool ConsoleGL::IsKeyDown( const EKeyboardKey a_KeyboardKey )
 {
-	return Window::IsKeyDown( a_KeyboardKey );
+	return GetKeyState( KeyCodes[ static_cast< uint8_t >( a_KeyboardKey ) ] ) & 0x8000;
+}
+
+bool ConsoleGL::IsKeyUp( const EKeyboardKey a_KeyboardKey )
+{
+	return !( GetKeyState( KeyCodes[ static_cast< uint8_t >( a_KeyboardKey ) ] ) & 0x8000 );
 }
 
 bool ConsoleGL::IsKeyPressed( const EKeyboardKey a_KeyboardKey )
 {
-	return Window::IsKeyPressed( a_KeyboardKey );
+	return !KeyStates[ static_cast< uint8_t >( a_KeyboardKey ) ] && IsKeyDown( a_KeyboardKey );
 }
 
 bool ConsoleGL::IsKeyReleased( const EKeyboardKey a_KeyboardKey )
 {
-	return Window::IsKeyReleased( a_KeyboardKey );
+	return KeyStates[ static_cast< uint8_t >( a_KeyboardKey ) ] && IsKeyUp( a_KeyboardKey );
 }
 
 bool ConsoleGL::IsMouseDown( const EMouseButton a_MouseButton )
 {
-	return Window::IsMouseDown( a_MouseButton );
+	return GetKeyState( MouseCodes[ static_cast< uint8_t >( a_MouseButton ) ] ) & 0x8000;
 }
 
 bool ConsoleGL::IsMouseUp( const EMouseButton a_MouseButton )
 {
-	return Window::IsMouseUp( a_MouseButton );
+	return !( GetKeyState( MouseCodes[ static_cast< uint8_t >( a_MouseButton ) ] ) & 0x8000 );
 }
 
 bool ConsoleGL::IsMousePressed( const EMouseButton a_MouseButton )
 {
-	return Window::IsMousePressed( a_MouseButton );
+	return !MouseStates[ static_cast< uint8_t >( a_MouseButton ) ] && IsMouseDown( a_MouseButton );
 }
 
 bool ConsoleGL::IsMouseReleased( const EMouseButton a_MouseButton )
 {
-	return Window::IsMouseReleased( a_MouseButton );
+	return MouseStates[ static_cast< uint8_t >( a_MouseButton ) ] && IsMouseUp( a_MouseButton );
 }
 
 void ConsoleGL::GetMousePosition( float& o_X, float& o_Y )
 {
-	return Window::GetMousePosition( o_X, o_Y );
+	o_X = MouseX;
+	o_Y = MouseY;
 }
 
 void ConsoleGL::GetMouseDelta( float& o_X, float& o_Y )
 {
-	return Window::GetMouseDelta( o_X, o_Y );
+	o_X = MouseDeltaX;
+	o_Y = MouseDeltaY;
 }
 
-void ConsoleGL::PollEvents()
+bool ConsoleGL::PollEvents()
 {
-	return Window::PollEvents();
+    if ( !State.ActiveWindow )
+    {
+	    Error::SetLastError( Error_NoActiveWindow );
+        return false;
+    }
+
+	for ( size_t i = 0u; i < KeyStates.size(); ++i )
+	{
+		KeyStates[ i ] = GetKeyState( KeyCodes[ i ] ) & 0x8000;
+	}
+
+	for ( size_t i = 0u; i < MouseStates.size(); ++i )
+	{
+		MouseStates[ i ] = GetKeyState( MouseCodes[ i ] ) & 0x8000;
+	}
+
+    // Get the current mouse position.
+    POINT Coordinates{ 0, 0 };
+
+	if ( !GetCursorPos( &Coordinates ) || !ScreenToClient( State.ActiveWindow->InternalInfo->WindowHandle, &Coordinates ) )
+	{
+		MouseX = 0.0f;
+		MouseY = 0.0f;
+        MouseDeltaX = 0.0f;
+        MouseDeltaY = 0.0f;
+	    Error::SetLastError( Error_GenericWindowFailure );
+		return false;
+	}
+
+    float NormalizedX = ( float )Coordinates.x;
+	float NormalizedY = ( float )Coordinates.y;
+
+    // Normalize coordinates.
+    NormalizedX /= State.ActiveWindow->Width * State.ActiveWindow->PixelWidth;
+    NormalizedY /= State.ActiveWindow->Height * State.ActiveWindow->PixelHeight;
+
+    // Set delta.
+    MouseDeltaX = NormalizedX - MouseX;
+    MouseDeltaY = NormalizedY - MouseY;
+
+    // Set new position.
+    MouseX = NormalizedX;
+    MouseY = NormalizedY;
+
+	return true;
 }
 
 #pragma endregion
@@ -822,12 +1538,12 @@ bool ConsoleGL::CompileShader( const ShaderHandle a_Shader )
 	};
 #endif
 
-	auto MakeProcInfo = []( const bool a_IsMemoryLoaded, const void* a_Handle, const void* a_Entry, const void* a_Info )
+	auto MakeProcInfo = []( const bool a_IsMemoryLoaded, const void* a_Handle, const ShaderProcInfo::RunFn a_Run, const ShaderProcInfo::InfoFn a_Info )
 	{
 		ShaderProcInfo* ProcInfo = new ShaderProcInfo;
 		ProcInfo->IsMemoryLoaded = a_IsMemoryLoaded;
 		ProcInfo->Handle = a_Handle;
-		ProcInfo->Entry = a_Entry;
+		ProcInfo->Run = a_Run;
 		ProcInfo->Info = a_Info;
 
 		return std::shared_ptr< ShaderProcInfo >( ProcInfo, +[]( const ShaderProcInfo* a_ProcInfo )
@@ -908,11 +1624,11 @@ bool ConsoleGL::CompileShader( const ShaderHandle a_Shader )
 				return false;
 			}
 
-			const void* ShaderEntry = GetProcAddress( ShaderHandle, "run" );
+			const void* ShaderRun = GetProcAddress( ShaderHandle, "run" );
 			
-			if ( !ShaderEntry )
+			if ( !ShaderRun )
 			{
-				Error::SetLastError( Error_ShaderEntryNotFound );
+				Error::SetLastError( Error_ShaderRunEntryNotFound );
 				return false;
 			}
 
@@ -920,12 +1636,12 @@ bool ConsoleGL::CompileShader( const ShaderHandle a_Shader )
 
 			if ( !ShaderInfo )
 			{
-				Error::SetLastError( Error_ShaderInfoNotFound );
+				Error::SetLastError( Error_ShaderInfoEntryNotFound );
 				return false;
 			}
 
 			// Setup proc info.
-			a_Shader->Proc = MakeProcInfo( false, ShaderHandle, ShaderEntry, ShaderInfo );
+			a_Shader->Proc = MakeProcInfo( false, ShaderHandle, ( ShaderProcInfo::RunFn )ShaderRun, ( ShaderProcInfo::InfoFn )ShaderInfo );
 			return true;
 		}
 
@@ -966,11 +1682,11 @@ bool ConsoleGL::CompileShader( const ShaderHandle a_Shader )
 			return false;
 		}
 
-		const void* ShaderEntry = MemoryGetProcAddress( ShaderHandle, "run" );
+		const void* ShaderRun = MemoryGetProcAddress( ShaderHandle, "run" );
 
-		if ( !ShaderEntry )
+		if ( !ShaderRun )
 		{
-			Error::SetLastError( Error_ShaderEntryNotFound );
+			Error::SetLastError( Error_ShaderRunEntryNotFound );
 			return false;
 		}
 		
@@ -978,11 +1694,11 @@ bool ConsoleGL::CompileShader( const ShaderHandle a_Shader )
 
 		if ( !ShaderInfo )
 		{
-			Error::SetLastError( Error_ShaderInfoNotFound );
+			Error::SetLastError( Error_ShaderInfoEntryNotFound );
 			return false;
 		}
 
-		a_Shader->Proc = MakeProcInfo( true, ShaderHandle, ShaderEntry, ShaderInfo );
+		a_Shader->Proc = MakeProcInfo( true, ShaderHandle, ( ShaderProcInfo::RunFn )ShaderRun, ( ShaderProcInfo::InfoFn )ShaderInfo );
 		return true;
 	}
 	default: break;
@@ -1193,12 +1909,12 @@ bool ConsoleGL::DetachShaderByType( const ShaderProgramHandle a_ShaderProgram, c
 
 	if ( !Entry.Attached )
 	{
-		Error::SetLastError( Error_ShaderEntryNotFound );
+		Error::SetLastError( Error_NoShaderOfType );
 		return false;
 	}
 
 	// Remove this program from the shaders list of attached to programs.
-	if ( const auto Iter = std::find( Entry.Attached->AttachedTo.begin(), Entry.Attached->AttachedTo.end(), a_ShaderProgram ); Iter != Entry.Attached->AttachedTo.end() )
+	if ( const auto Iter = std::ranges::find( Entry.Attached->AttachedTo.begin(), Entry.Attached->AttachedTo.end(), a_ShaderProgram ); Iter != Entry.Attached->AttachedTo.end() )
 	{
 		Entry.Attached->AttachedTo.erase( Iter );
 	}
@@ -1304,7 +2020,7 @@ struct Layout
 	vec4 out_FragColour;
 };
 
-extern "C" __declspec(dllexport) void run( Layout* layout )
+void run( Layout* layout )
 {
 	layout->out_Position = layout->uni_PV * layout->uni_M * layout->out_FragColour;
 }
@@ -1328,7 +2044,7 @@ struct Layout
 	vec4 out_FragColour;
 };
 
-extern "C" __declspec(dllexport) void run( Layout* layout )
+void run( Layout* layout )
 {
 	layout->out_Position = layout->uni_PV * layout->uni_M * layout->out_FragColour;
 }
@@ -1345,24 +2061,9 @@ extern "C" __declspec(dllexport) void run( Layout* layout )
 	ConsoleGL::DetachShader( DefaultShaderProgram, DefaultFragmentShader );
 	ConsoleGL::DeleteShader( DefaultFragmentShader );
 
-	struct Field
-	{
-		const char* Name;
-		uint64_t Offset;
-		uint64_t Size;
-		uint16_t DataType;
-		uint16_t IOType;
-		uint16_t BuiltinVar;
-		uint16_t Slot;
-	};
-	
-	struct LayoutInfo
-	{
-		Field* Fields;
-		size_t FieldCount;
-	};
 
-	using func_type = LayoutInfo*(*)();
+
+	using func_type = ShaderLayoutInfo*(*)();
 
 	func_type func = (func_type)DefaultShaderProgram->Entries[(size_t)EShaderType::Fragment].Proc->Info;
 

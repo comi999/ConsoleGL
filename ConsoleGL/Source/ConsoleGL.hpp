@@ -41,7 +41,12 @@ namespace ConsoleGL
 		Error_ArgumentError,
 
 		Error_WindowDockCreationFailure,
-		Error_WindowFailure,
+		Error_GenericWindowFailure,
+		Error_WindowReturnFailure,
+		Error_WindowBorrowFailure,
+		Error_WindowSetTitleFailure,
+		Error_WindowInvalidColourSet,
+		Error_WindowBufferWriteFailure,
 
 		Error_NoActiveWindow,
 		Error_NoActiveContext,
@@ -56,6 +61,7 @@ namespace ConsoleGL
 		Error_InvalidContextHandle,
 		Error_InvalidShaderHandle,
 		Error_InvalidShaderProgramHandle,
+		Error_InvalidWindowBufferIndex,
 
 		Error_ShaderCompilerWriteFailure,
 		Error_ShaderCompilerPipeCreationFailure,
@@ -65,11 +71,12 @@ namespace ConsoleGL
 		Error_ShaderBinaryFileCleanupFailure,
 		Error_ShaderBinaryFileLoadFailure,
 		Error_ShaderBinaryLoadFailure,
-		Error_ShaderEntryNotFound,
-		Error_ShaderInfoNotFound,
+		Error_ShaderRunEntryNotFound,
+		Error_ShaderInfoEntryNotFound,
 		Error_ShaderAlreadyCompiled,
 		Error_ShaderProgramAlreadyLinked,
-		Error_ShaderProgramLinkFailure
+		Error_ShaderProgramLinkFailure,
+		Error_NoShaderOfType
 	};
 
 	enum class EKeyboardKey : uint8_t
@@ -360,14 +367,14 @@ namespace ConsoleGL
 
 #undef CreateWindow
 	CONSOLEGL_API WindowHandle CreateWindow( const char* a_Title, uint32_t a_Width, uint32_t a_Height, uint32_t a_PixelWidth, uint32_t a_PixelHeight, uint32_t a_BufferCount );
-    CONSOLEGL_API void DestroyWindow( WindowHandle a_Window );
-    CONSOLEGL_API void SetActiveWindow( WindowHandle a_Window );
+    CONSOLEGL_API bool DestroyWindow( WindowHandle a_Window );
+    CONSOLEGL_API bool SetActiveWindow( WindowHandle a_Window );
     CONSOLEGL_API WindowHandle GetActiveWindow();
-    CONSOLEGL_API void SetWindowTitle( const char* a_Title );
-    CONSOLEGL_API void SetWindowColoursFromArray( const Colour* a_Colours );
-    CONSOLEGL_API void SetWindowColoursFromSet( EColourSet a_ColourSet );
-    CONSOLEGL_API void SwapWindowBuffer();
-    CONSOLEGL_API void SwapWindowBufferByIndex( uint32_t a_Index );
+    CONSOLEGL_API bool SetWindowTitle( const char* a_Title );
+    CONSOLEGL_API bool SetWindowColoursFromArray( const Colour* a_Colours );
+    CONSOLEGL_API bool SetWindowColoursFromSet( EColourSet a_ColourSet );
+    CONSOLEGL_API bool SwapWindowBuffer();
+    CONSOLEGL_API bool SwapWindowBufferToIndex( uint32_t a_Index );
     CONSOLEGL_API const char* GetWindowTitle( WindowHandle a_Window );
     CONSOLEGL_API uint32_t GetWindowWidth( WindowHandle a_Window );
     CONSOLEGL_API uint32_t GetWindowHeight( WindowHandle a_Window );
@@ -400,7 +407,7 @@ namespace ConsoleGL
 	CONSOLEGL_API bool IsMouseReleased( EMouseButton a_MouseButton );
 	CONSOLEGL_API void GetMousePosition( float& o_X, float& o_Y );
 	CONSOLEGL_API void GetMouseDelta( float& o_X, float& o_Y );
-	CONSOLEGL_API void PollEvents();
+	CONSOLEGL_API bool PollEvents();
 
 #pragma endregion
 
