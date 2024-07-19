@@ -11,6 +11,7 @@ TODO( "All this crap needs to be cleaned up properly." );
 
 std::string GetVisualStudioVersion()
 {
+	TODO( "Could this be just provided by a main arg instead?" );
 	auto exec = [](std::string cmd) -> std::string{
 		HANDLE hPipeRead, hPipeWrite;
 		SECURITY_ATTRIBUTES saAttr = {sizeof(SECURITY_ATTRIBUTES)};
@@ -33,7 +34,7 @@ std::string GetVisualStudioVersion()
 		siStartInfo.hStdError = hPipeWrite;
 		siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
 
-		std::vector<char> cmdline(cmd.begin(), cmd.end());
+		std::vector cmdline(cmd.begin(), cmd.end());
 		cmdline.push_back(0);
 
 		if (!CreateProcessA(nullptr, cmdline.data(), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &siStartInfo, &piProcInfo)) {
@@ -62,9 +63,9 @@ std::string GetVisualStudioVersion()
 		return result;
 	};
 
-	std::string Response = exec("where devenv");
+	const std::string Response = exec("where devenv");
 
-    std::regex pattern("\\\\[0-9][0-9][0-9][0-9]\\\\");
+    const std::regex pattern("\\\\[0-9][0-9][0-9][0-9]\\\\");
     std::smatch matches;
 
     if (!std::regex_search(Response, matches, pattern)) {
@@ -76,392 +77,89 @@ std::string GetVisualStudioVersion()
 	return "vs" + VSYear;
 }
 
-std::string StripComments( const std::string& a_Input )
+void StripComments( std::string& a_String )
 {
-    const std::regex CommentRegex( R"(//.*$)" );
-    return std::regex_replace( a_Input, CommentRegex, "" );
+    // Replace all matches with an empty string
+    a_String = std::regex_replace( a_String, std::regex( R"((//(.|\n)*?$)|(/\*(.|\n)*?\*/))" ), "" );
 }
 
-bool ExtractLayout( const std::string& a_Input, std::string& o_Output )
+struct ShaderVariableInfo
 {
-	const std::string CommentStrippedInput = StripComments( a_Input );
-	const std::regex LayoutRegex( R"(struct\s+Layout\s*\{([^}]*)\})" );
-    
-    if ( std::smatch LayoutMatch; std::regex_search( CommentStrippedInput, LayoutMatch, LayoutRegex ) ) 
-	{
-        o_Output = LayoutMatch[ 1 ].str();
-		return true;
+    std::string InterpQualifier;
+	std::string StorageQual;
+    int32_t Location = -1;
+    std::string Type;
+    std::string Name;
+};
+
+std::vector< ShaderVariableInfo > GetGlobalVariables( const std::string& a_String )
+{
+    std::smatch Matches;
+	std::regex VariablePattern( R"(^\s*(prsp|flat|affn)?\s*(uniform|attrib|in|out)(\(\s*(\d+)\s*\))?\s*(\w+)\s*(\w+)\s*(\[\s*(\d+)\s*\])?\s*;)" );
+	std::vector< ShaderVariableInfo > Result;
+
+    std::sregex_iterator Iter( a_String.begin(), a_String.end(), VariablePattern ), End;
+
+    while ( Iter != End )
+    {
+        ShaderVariableInfo VariableInfo;
+        std::smatch Match = *Iter;
+
+        VariableInfo.InterpQualifier = Match[ 1u ];
+        VariableInfo.StorageQual = Match[ 2u ];
+        VariableInfo.Location = Match[ 4u ].matched ? std::stoi( Match[ 4u ] ) : -1;
+        VariableInfo.Type = Match[ 5u ];
+        VariableInfo.Name = Match[ 6u ];
+        Result.emplace_back( std::move( VariableInfo ) );
+        ++Iter;
     }
 
-	// Error
-    return false;
+	return Result;
 }
 
-struct FieldInfo
-{
-	std::string Type;
-	std::string Prefix;
-	std::string Name;
-};
-
-bool ExtractFields( const std::string& a_Input, std::vector< FieldInfo >& o_Output )
-{
-	// Supported types:
-	// - int8|int16|int32|int64|uint8|uint16|uint32|uint64|float|double|bool
-	// - mat2|mat3|mat4
-	// - mat2x3|mat2x4|mat3x2|mat3x4|mat4x2|mat4x3
-	// - dmat2|dmat3|dmat4
-	// - dmat2x3|dmat2x4|dmat3x2|dmat3x4|dmat4x2|dmat4x3
-	// - vec2|vec3|vec4
-	// - dvec2|dvec3|dvec4
-	// - ivec2|ivec3|ivec4
-	// - uvec2|uvec3|uvec4
-
-	std::regex FieldRegex( R"((int8|int16|int32|int64|uint8|uint16|uint32|uint64|float|double|bool|mat2|mat3|mat4|mat2x3|mat2x4|mat3x2|mat3x4|mat4x2|mat4x3|dmat2|dmat3|dmat4|dmat2x3|dmat2x4|dmat3x2|dmat3x4|dmat4x2|dmat4x3|vec2|vec3|vec4|dvec2|dvec3|dvec4|ivec2|ivec3|ivec4|uvec2|uvec3|uvec4)\s+(\w+)_(\w+)\s*;)" );
-	auto Begin = std::sregex_iterator( a_Input.begin(), a_Input.end(), FieldRegex );
-    auto End = std::sregex_iterator();
-
-    for ( std::sregex_iterator i = Begin; i != End; ++i ) 
-	{
-        std::smatch Match = *i;
-
-		if ( Match.size() < 4u )
-		{
-			// Error
-			return false;
-		}
-
-        o_Output.push_back( { Match[ 1u ].str(), Match[ 2u ].str(), Match[ 3u ].str() } );
-    }
-
-    return true;
-}
-
-enum class EIOType
-{
-	Uniform,
-	In,
-	Vin,
-	Out,
-	Vout,
-	Attr,
-};
-
-enum class EDataType
-{
-	DT_int8,
-	DT_int16,
-	DT_int32,
-	DT_int64,
-	DT_uint8,
-	DT_uint16,
-	DT_uint32,
-	DT_uint64,
-	DT_float,
-	DT_double,
-	DT_bool,
-	DT_mat2,
-	DT_mat3,
-	DT_mat4,
-	DT_mat2x3,
-	DT_mat2x4,
-	DT_mat3x2,
-	DT_mat3x4,
-	DT_mat4x2,
-	DT_mat4x3,
-	DT_dmat2,
-	DT_dmat3,
-	DT_dmat4,
-	DT_dmat2x3,
-	DT_dmat2x4,
-	DT_dmat3x2,
-	DT_dmat3x4,
-	DT_dmat4x2,
-	DT_dmat4x3,
-	DT_vec2,
-	DT_vec3,
-	DT_vec4,
-	DT_dvec2,
-	DT_dvec3,
-	DT_dvec4,
-	DT_ivec2,
-	DT_ivec3,
-	DT_ivec4,
-	DT_uvec2,
-	DT_uvec3,
-	DT_uvec4,
-};
-
-enum class EInbuiltVarType
-{
-	IF_None,
-
-	// The clip-space output position of the current vertex
-	IF_vec4_out_Position,
-
-	// The location of the fragment in window space
-	IF_vec4_in_FragCoord,
-
-	// The colour to set the fragment
-	IF_vec4_out_FragColour,
-
-	// The depth to assign to the fragment.
-	IF_float_out_FragDepth
-};
-
-struct Field
-{
-	EDataType DataType;
-	std::string DataTypeString;
-	EIOType IOType;
-	EInbuiltVarType InbuiltVarType = EInbuiltVarType::IF_None;
-	std::string Name;
-	std::string FieldString;
-	uint32_t Slot = -1;
-};
-
-bool ProcessField( const FieldInfo& a_Input, Field& o_Field )
-{
-	bool ValidType = true;
-
-	if ( a_Input.Type == "" ) ValidType = false;
-	else if ( a_Input.Type == "int8"	) { o_Field.DataType = EDataType::DT_int8	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "int16"	) { o_Field.DataType = EDataType::DT_int16	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "int32"	) { o_Field.DataType = EDataType::DT_int32	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "int64"	) { o_Field.DataType = EDataType::DT_int64	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "uint8"	) { o_Field.DataType = EDataType::DT_uint8	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "uint16"	) { o_Field.DataType = EDataType::DT_uint16	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "uint32"	) { o_Field.DataType = EDataType::DT_uint32	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "uint64"	) { o_Field.DataType = EDataType::DT_uint64	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "float"	) { o_Field.DataType = EDataType::DT_float	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "double"	) { o_Field.DataType = EDataType::DT_double	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "bool"	) { o_Field.DataType = EDataType::DT_bool	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "mat2"	) { o_Field.DataType = EDataType::DT_mat2	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "mat3"	) { o_Field.DataType = EDataType::DT_mat3	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "mat4"	) { o_Field.DataType = EDataType::DT_mat4	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "mat2x3"	) { o_Field.DataType = EDataType::DT_mat2x3	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "mat2x4"	) { o_Field.DataType = EDataType::DT_mat2x4	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "mat3x2"	) { o_Field.DataType = EDataType::DT_mat3x2	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "mat3x4"	) { o_Field.DataType = EDataType::DT_mat3x4	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "mat4x2"	) { o_Field.DataType = EDataType::DT_mat4x2	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "mat4x3"	) { o_Field.DataType = EDataType::DT_mat4x3	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "dmat2"	) { o_Field.DataType = EDataType::DT_dmat2	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "dmat3"	) { o_Field.DataType = EDataType::DT_dmat3	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "dmat4"	) { o_Field.DataType = EDataType::DT_dmat4	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "dmat2x3" ) { o_Field.DataType = EDataType::DT_dmat2x3; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "dmat2x4" ) { o_Field.DataType = EDataType::DT_dmat2x4; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "dmat3x2" ) { o_Field.DataType = EDataType::DT_dmat3x2; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "dmat3x4" ) { o_Field.DataType = EDataType::DT_dmat3x4; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "dmat4x2" ) { o_Field.DataType = EDataType::DT_dmat4x2; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "dmat4x3" ) { o_Field.DataType = EDataType::DT_dmat4x3; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "vec2"	) { o_Field.DataType = EDataType::DT_vec2	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "vec3"	) { o_Field.DataType = EDataType::DT_vec3	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "vec4"	) { o_Field.DataType = EDataType::DT_vec4	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "dvec2"	) { o_Field.DataType = EDataType::DT_dvec2	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "dvec3"	) { o_Field.DataType = EDataType::DT_dvec3	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "dvec4"	) { o_Field.DataType = EDataType::DT_dvec4	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "ivec2"	) { o_Field.DataType = EDataType::DT_ivec2	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "ivec3"	) { o_Field.DataType = EDataType::DT_ivec3	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "ivec4"	) { o_Field.DataType = EDataType::DT_ivec4	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "uvec2"	) { o_Field.DataType = EDataType::DT_uvec2	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "uvec3"	) { o_Field.DataType = EDataType::DT_uvec3	; o_Field.DataTypeString = a_Input.Type; }
-	else if ( a_Input.Type == "uvec4"	) { o_Field.DataType = EDataType::DT_uvec4	; o_Field.DataTypeString = a_Input.Type; }
-	else ValidType = false;
-
-	if ( !ValidType )
-	{
-		// Error
-		return false;
-	}
-
-	bool ValidIOType = true;
-
-	if ( a_Input.Prefix == "" ) ValidIOType = false;
-	else if ( a_Input.Prefix == "uni"	) { o_Field.IOType = EIOType::Uniform	; }
-	else if ( a_Input.Prefix == "in"	) { o_Field.IOType = EIOType::In		; }
-	else if ( a_Input.Prefix == "vin"	) { o_Field.IOType = EIOType::Vin		; }
-	else if ( a_Input.Prefix == "out"	) { o_Field.IOType = EIOType::Out		; }
-	else if ( a_Input.Prefix == "vout"	) { o_Field.IOType = EIOType::Vout		; }
-	else if ( a_Input.Prefix.starts_with( "attr" ) )
-	{
-		const std::string SlotString = a_Input.Prefix.substr( 4u );
-
-		if ( SlotString.find_first_not_of( "01234567890" ) != std::string::npos )
-		{
-			// Error, Invalid attribute slot number
-			return false;
-		}
-
-		o_Field.Slot = std::stoi( SlotString );
-		o_Field.IOType = EIOType::Attr;
-	}
-	else ValidIOType = false;
-
-	if ( !ValidIOType )
-	{
-		// Error
-		return false;
-	}
-
-	o_Field.Name = a_Input.Name;
-
-	// Check if this is an inbuilt variable.
-
-	// Is this a position variable?
-	if ( a_Input.Name == "Position" )
-	{
-		// It must be either Vout or Out, since this is 
-		if ( o_Field.IOType != EIOType::Out )
-		{
-			// Error, Inbuilt Variable 'Position' must be Out
-			return false;
-		}
-
-		if ( o_Field.DataType != EDataType::DT_vec4 )
-		{
-			// Error, Inbuilt Variable 'Position' must be vec4.
-			return false;
-		}
-
-		o_Field.InbuiltVarType = EInbuiltVarType::IF_vec4_out_Position;
-	}
-	else if ( a_Input.Name == "FragCoord" )
-	{
-		// It must be either Vout or Out, since this is 
-		if ( o_Field.IOType != EIOType::In )
-		{
-			// Error, Inbuilt Variable 'FragCoord' must be In
-			return false;
-		}
-
-		if ( o_Field.DataType != EDataType::DT_vec4 )
-		{
-			// Error, Inbuilt Variable 'FragCoord' must be vec4.
-			return false;
-		}
-
-		o_Field.InbuiltVarType = EInbuiltVarType::IF_vec4_in_FragCoord;
-	}
-	else if ( a_Input.Name == "FragColour" )
-	{
-		// It must be Out
-		if ( o_Field.IOType != EIOType::Out )
-		{
-			// Error, Inbuilt Variable 'FragColour' must be Out
-			return false;
-		}
-
-		if ( o_Field.DataType != EDataType::DT_vec4 )
-		{
-			// Error, Inbuilt Variable 'FragColour' must be vec4.
-			return false;
-		}
-
-		o_Field.InbuiltVarType = EInbuiltVarType::IF_vec4_out_FragColour;
-	}
-	else if ( a_Input.Name == "FragDepth" )
-	{
-		// It must be Out
-		if ( o_Field.IOType != EIOType::Out )
-		{
-			// Error, Inbuilt Variable 'FragDepth' must be Out
-			return false;
-		}
-
-		if ( o_Field.DataType != EDataType::DT_float )
-		{
-			// Error, Inbuilt Variable 'FragDepth' must be vec4.
-			return false;
-		}
-
-		o_Field.InbuiltVarType = EInbuiltVarType::IF_float_out_FragDepth;
-	}
-
-	o_Field.FieldString = a_Input.Prefix + "_" + a_Input.Name;
-
-	return true;
-}
-
-bool ProcessFields( const std::vector< FieldInfo >& a_Input, std::vector< Field >& o_Output )
-{
-	for ( auto& Input : a_Input )
-	{
-		Field ProcessedField;
-
-		if ( ProcessField( Input, ProcessedField ) )
-		{
-			o_Output.push_back( ProcessedField );
-		}
-		else
-		{
-			// Error on this line.
-			return false;
-		}
-	}
-
-	return true;
-}
-
-//struct Field_
-//{
-//	const char* Name;
-//	uint64_t Offset;
-//	uint64_t Size;
-//	uint16_t DataType;
-//	uint16_t IOType;
-//	uint16_t BuiltinVar;
-//	uint16_t Slot;
-//};
-//
-//struct LayoutInfo
-//{
-//	Field_* Fields;
-//	size_t FieldCount;
-//};
-
-std::string CreateInfoFunction( const std::vector< Field >& a_Input )
+std::string CreateInfoFunction( const std::vector< ShaderVariableInfo >& a_Input )
 {
 	std::string Result;
 	Result += R"(
-struct Field
+struct ShaderVariableInfo
 {
-	const char* Name;
-	uint64_t Offset;
-	uint64_t Size;
-	uint16_t DataType;
-	uint16_t IOType;
-	uint16_t BuiltinVar;
-	uint16_t Slot;
+	const char* InterpQual = nullptr;
+	const char* StorageQual = nullptr;
+	const char* Type = nullptr;
+	const char* Name = nullptr;
+	const void* Data = nullptr;
+	uint64_t Size = 0u;
+	uint64_t Length = 1u;
+	uint64_t Location = -1;
 };
 
-struct LayoutInfo
+struct ShaderInfo
 {
-	Field* Fields;
-	size_t FieldCount;
-	size_t Size;
+	ShaderVariableInfo* Variables;
+	size_t VariableCount;
 };
 
 )";
 
-	Result += "extern \"C\" __declspec(dllexport) LayoutInfo* info()\n{\n";
-	Result += "\tstatic Field Fields[" + std::to_string( a_Input.size() ) + "];\n\n";
+	Result += "extern \"C\" __declspec(dllexport) ShaderInfo* info()\n{\n";
+	Result += "\tstatic ShaderVariableInfo Variables[" + std::to_string( a_Input.size() ) + "] {};\n\n";
 
 	for ( size_t i = 0u; i < a_Input.size(); ++i )
 	{
 		std::string Index = std::to_string( i );
-		Result += "\tFields[" + Index + "].Name = \"" + a_Input[ i ].Name + "\";\n";
-		Result += "\tFields[" + Index + "].Offset = offsetof(Layout, " + a_Input[ i ].FieldString + ");\n";
-		Result += "\tFields[" + Index + "].Size = sizeof(" + a_Input[ i ].DataTypeString + ");\n";
-		Result += "\tFields[" + Index + "].DataType = " + std::to_string( ( size_t )a_Input[ i ].DataType ) + ";\n";
-		Result += "\tFields[" + Index + "].IOType = " + std::to_string( ( size_t )a_Input[ i ].IOType ) + ";\n";
-		Result += "\tFields[" + Index + "].BuiltinVar = " + std::to_string( ( size_t )a_Input[ i ].InbuiltVarType ) + ";\n";
-		Result += "\tFields[" + Index + "].Slot = " + std::to_string( ( int16_t )a_Input[ i ].Slot ) + ";\n\n";
+		Result += std::vformat( "\tVariables[{0}].InterpQual = \"{1}\";\n", std::make_format_args( Index, a_Input[ i ].InterpQualifier ) );
+		Result += std::vformat( "\tVariables[{0}].StorageQual = \"{1}\";\n", std::make_format_args( Index, a_Input[ i ].StorageQual ) );
+		Result += std::vformat( "\tVariables[{0}].Type = \"{1}\";\n", std::make_format_args( Index, a_Input[ i ].Type ) );
+		Result += std::vformat( "\tVariables[{0}].Name = \"{1}\";\n", std::make_format_args( Index, a_Input[ i ].Name ) );
+		Result += std::vformat( "\tVariables[{0}].Data = &{1};\n", std::make_format_args( Index, a_Input[ i ].Name ) );
+		Result += std::vformat( "\tVariables[{0}].Size = sizeof({1});\n", std::make_format_args( Index, a_Input[ i ].Name ) );
+		Result += std::vformat( "\tVariables[{0}].Length = sizeof({1}) / sizeof({2});\n", std::make_format_args( Index, a_Input[ i ].Name, a_Input[ i ].Type ) );
+		Result += std::vformat( "\tVariables[{0}].Location = {1};\n", std::make_format_args( Index, std::to_string( a_Input[ i ].Location ) ) );
 	}
-
-	Result += "\tstatic LayoutInfo Info;\n";
-	Result += "\tInfo.Fields = Fields;\n";
-	Result += "\tInfo.FieldCount = " + std::to_string( a_Input.size() ) + ";\n";
-	Result += "\tInfo.Size = sizeof(Layout);\n";
+	
+	Result += "\tstatic ShaderInfo Info;\n";
+	Result += "\tInfo.Variables = Variables;\n";
+	Result += "\tInfo.VariableCount = " + std::to_string( a_Input.size() ) + ";\n";
 
 	Result += "\treturn &Info;\n";
 	Result += "}\n";
@@ -469,9 +167,17 @@ struct LayoutInfo
 	return Result;
 }
 
-std::string CreateTypedefs()
+void ProcessSource( const std::string& a_Input, std::string& o_Output )
 {
-	return R"(
+	// Include headers:
+	o_Output += R"(
+#include <cstdint>
+#include <cstddef>
+#include <glm.hpp>
+)";
+
+	// Typedefs:
+	o_Output += R"(
 using int8 = int8_t;
 using int16 = int16_t;
 using int32 = int32_t;
@@ -510,45 +216,36 @@ using ivec4 = glm::ivec4;
 using uvec2 = glm::uvec2;
 using uvec3 = glm::uvec3;
 using uvec4 = glm::uvec4;
+
 )";
-}
 
-bool ProcessSource( const std::string& a_Input, std::string& o_Output )
-{
-	std::string ExtractedLayout;
+	// Keyword defines:
+	o_Output += R"(
+#define affn
+#define flat
+#define prsp
+#define uniform(x)
+#define attrib(x)
+#define in
+#define out
 
-	if ( !ExtractLayout( a_Input, ExtractedLayout ) )
-	{
-		return false;
-	}
+)";
 
-	std::vector< FieldInfo > ExtractedFields;
+	std::string Source = a_Input;
+	
+	// Strip all comments:
+	StripComments( Source );
 
-	if ( !ExtractFields( ExtractedLayout, ExtractedFields ) )
-	{
-		return false;
-	}
-
-	std::vector< Field > ProcessedFields;
-
-	if ( !ProcessFields( ExtractedFields, ProcessedFields ) )
-	{
-		return false;
-	}
-
+	// Replace run function with dllexport declaration:
 	std::string DeclspecInput = a_Input;
     const std::regex RunDeclaration( R"(\bvoid\s+run\b)" );
     const std::string DeclspecRunDeclaration = R"(extern "C" __declspec(dllexport) void run)";
+    o_Output += std::regex_replace( Source, RunDeclaration, DeclspecRunDeclaration );
 
-    DeclspecInput = std::regex_replace( DeclspecInput, RunDeclaration, DeclspecRunDeclaration );
+	// Add info function:
+	const std::vector VariableInfos = GetGlobalVariables( Source );
 
-    o_Output = 
-		"#include <cstdint>\n"
-		"#include <cstddef>\n"
-		"#include <glm.hpp>\n\n"
-	+ CreateTypedefs() + DeclspecInput + CreateInfoFunction( ProcessedFields );
-
-	return true;
+	o_Output += CreateInfoFunction( VariableInfos );
 }
 
 #include <glm.inl>
@@ -690,11 +387,7 @@ int main( int a_ArgCount, const char** a_Args )
 
 	// Create intermediate source file
 	std::string SourceFileTextProcessed;
-
-	if ( !ProcessSource( SourceFileText, SourceFileTextProcessed ) )
-	{
-		return 1;
-	}
+	ProcessSource( SourceFileText, SourceFileTextProcessed );
 
 	// Write out the intermediate source file.
 	{
@@ -735,7 +428,7 @@ int main( int a_ArgCount, const char** a_Args )
 	}
 
 	ReturnCode = system( std::vformat( "premake5 --file=\"Temp\\premake5.lua\" vs2022", std::make_format_args( VisualStudioVersion ) ).c_str() ); if ( ReturnCode != 0 ) return 1;
-	ReturnCode = system( std::vformat( "msbuild Temp\\Shader.vcxproj /p:Configuration=Debug /p:Platform=x64", std::make_format_args( SourceName ) ).c_str() ); if ( ReturnCode != 0 ) return 1;
+	ReturnCode = system( "msbuild Temp\\Shader.vcxproj /p:Configuration=Debug /p:Platform=x64" ); if ( ReturnCode != 0 ) return 1;
 	ReturnCode = std::filesystem::remove_all( BinaryFile );
 	ReturnCode = std::filesystem::remove_all( OutputFile );
 	ReturnCode = std::filesystem::copy_file( "Temp\\bin\\Shader.dll", BinaryFile ); if ( ReturnCode != 1 ) return 1;

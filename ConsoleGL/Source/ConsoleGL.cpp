@@ -5,6 +5,7 @@
 #include <chrono>
 #include <filesystem>
 #include <bitset>
+#include <set>
 
 #include <ConsoleGL.hpp>
 #include <Error.hpp>
@@ -26,6 +27,17 @@
 #include <ShaderCompiler.inl>
 #endif
 
+#define SHADER_STAGE_COUNT 2u
+
+// To do
+// Move error into this cpp.
+// Make all function calls give Error_NoError if they succeed.
+// Really think about vin,vout etc
+// strip down shader compiler to only deal with strings and not validate anything
+// move shader field validation into cpp
+// make shaderinfo logging better, strip down shadercompiler txt.
+// properly define the destructors so that things are cleaned up at the end.
+
 ConsoleGL::EError ConsoleGL::GetLastError()
 {
 	return Error::GetLastError();
@@ -44,22 +56,37 @@ const char* ConsoleGL::GetErrorMessage( const EError a_Error )
 char	ShaderInfoLog[ SHADER_INFO_LOG_MAX ];
 size_t	ShaderInfoLogLength = 0u;
 
+char	ShaderProgramInfoLog[ SHADER_PROGRAM_INFO_LOG_MAX ];
+size_t	ShaderProgramInfoLogLength = 0u;
+
 void ClearShaderInfoLog()
 {
 	ZeroMemory( ShaderInfoLog, sizeof( ShaderInfoLog ) );
 	ShaderInfoLogLength = 0u;
 }
 
-void WriteToShaderInfoLog( const char* a_String, const size_t a_Length )
+void ClearShaderProgramInfoLog()
 {
-	memcpy_s( ShaderInfoLog + ShaderInfoLogLength, sizeof( ShaderInfoLog ) - 1 - ShaderInfoLogLength, a_String, a_Length );
-	ShaderInfoLogLength += a_Length;
+	ZeroMemory( ShaderProgramInfoLog, sizeof( ShaderProgramInfoLog ) );
+	ShaderProgramInfoLogLength = 0u;
 }
 
-template < size_t _Size >
-void WriteToShaderInfoLog( const char( &a_String )[ _Size ] )
+void WriteToShaderInfoLog( const char* a_String, ... )
 {
-	WriteToShaderInfoLog( a_String, _Size );
+	va_list VaList;
+	va_start( VaList, a_String );
+	const size_t Length = vsprintf_s( ShaderInfoLog + ShaderInfoLogLength, sizeof( ShaderInfoLog ) - 1 - ShaderInfoLogLength, a_String, VaList );
+	va_end( VaList );
+	ShaderInfoLogLength += Length;
+}
+
+void WriteToShaderProgramInfoLog( const char* a_String, ... )
+{
+	va_list VaList;
+	va_start( VaList, a_String );
+	const size_t Length = vsprintf_s( ShaderProgramInfoLog + ShaderProgramInfoLogLength, sizeof( ShaderProgramInfoLog ) - 1 - ShaderProgramInfoLogLength, a_String, VaList );
+	va_end( VaList );
+	ShaderProgramInfoLogLength += Length;
 }
 
 #pragma region Repository
@@ -77,6 +104,17 @@ public: \
 	Name##Repository( Name##Repository&& ) = delete; \
 	Name##Repository& operator=( const Name##Repository& ) = delete; \
 	Name##Repository& operator=( Name##Repository&& ) = delete; \
+\
+	~Name##Repository() \
+	{ \
+		for ( auto& Instance : Instances ) \
+		{ \
+			if ( Instance.has_value() ) \
+			{ \
+				Destructor##Name( &Instance.value() ); \
+			} \
+		} \
+	} \
 \
 	size_t Used() const { return SlotsUsed; } \
 	size_t Free() const { return C##apacity - Used(); } \
@@ -164,31 +202,9 @@ namespace ConsoleGL
 	    EWindowDockCommand Command;
 	    uint32_t Value;
 	};
-	
-	struct InternalInfo
-	{
-	    HWND                WindowHandle;
-	    SMALL_RECT          WindowRegion;
-	    STARTUPINFOA        StartupInfo;
-	    PROCESS_INFORMATION ProcessInfo;
-	};
 
 	struct Window
 	{
-		static bool IsKeyDown( const EKeyboardKey a_KeyboardKey );
-		static bool IsKeyUp( const EKeyboardKey a_KeyboardKey );
-		static bool IsKeyPressed( const EKeyboardKey a_KeyboardKey );
-		static bool IsKeyReleased( const EKeyboardKey a_KeyboardKey );
-		static bool IsMouseDown( const EMouseButton a_MouseButton );
-		static bool IsMouseUp( const EMouseButton a_MouseButton );
-		static bool IsMousePressed( const EMouseButton a_MouseButton );
-		static bool IsMouseReleased( const EMouseButton a_MouseButton );
-		static void GetMousePosition( float& o_X, float& o_Y );
-		static void GetMouseDelta( float& o_X, float& o_Y );
-		static void PollEvents();
-
-
-
 	    uint32_t					    Width;
 	    uint32_t					    Height;
 	    uint32_t					    PixelWidth;
@@ -196,23 +212,13 @@ namespace ConsoleGL
 	    std::vector< PixelBuffer >	    Buffers;
 	    uint32_t					    ActiveBuffer;
 	    std::string					    Title;
-		std::shared_ptr< InternalInfo > InternalInfo;
 	    FileMap                         CommandBuffer;
 		Event                           CommandReady;
 	    Event                           CommandComplete;
 	    Event                           ProcessStarted;
-	
-		static std::bitset< 99 >	s_KeyStates;
-		static std::bitset< 3  >	s_MouseStates;
-		static float				s_MouseX;
-		static float				s_MouseY;
-		static float				s_MouseDeltaX;
-		static float				s_MouseDeltaY;
-	};
-
-	struct Context
-	{
-		ShaderProgramHandle	ActiveShaderProgram;
+		HWND							WindowHandle;
+	    STARTUPINFOA					StartupInfo;
+	    PROCESS_INFORMATION				ProcessInfo;
 	};
 
 	enum class EShaderSourceType
@@ -224,36 +230,135 @@ namespace ConsoleGL
 		MemoryCompiled
 	};
 
-	struct ShaderLayout;
-
-	struct ShaderField
+	enum class EShaderVarType
 	{
-		const char* Name;
-		uint64_t	Offset;
-		uint64_t	Size;
-		uint16_t	DataType;
-		uint16_t	IOType;
-		uint16_t	BuiltinVar;
-		uint16_t	Slot;
+		Custom,
+		Int8,
+		Int16,
+		Int32,
+		Int64,
+		Uint8,
+		Uint16,
+		Uint32,
+		Uint64,
+		Float,
+		Double,
+		Bool,
+		Mat2,
+		Mat3,
+		Mat4,
+		Mat2x3,
+		Mat2x4,
+		Mat3x2,
+		Mat3x4,
+		Mat4x2,
+		Mat4x3,
+		Dmat2,
+		Dmat3,
+		Dmat4,
+		Dmat2x3,
+		Dmat2x4,
+		Dmat3x2,
+		Dmat3x4,
+		Dmat4x2,
+		Dmat4x3,
+		Vec2,
+		Vec3,
+		Vec4,
+		Dvec2,
+		Dvec3,
+		Dvec4,
+		Ivec2,
+		Ivec3,
+		Ivec4,
+		Uvec2,
+		Uvec3,
+		Uvec4
+	};
+
+	enum class EShaderInterpQual
+	{
+		None,
+		Flat,
+		Affine,
+		Perspective
+	};
+
+	enum class EShaderStorageQual
+	{
+		In,
+		Out,
+		Uniform,
+		Attribute
+	};
+
+	enum class EVertexShaderInbuilt
+	{
+		// The clip-space output position of the current vertex
+		out_vec4_VertPosition,
+
+		// Not an inbuilt type.
+		None
+	};
+
+	enum class EFragmentShaderInbuilt
+	{
+		// The location of the fragment in window space
+		in_vec4_FragCoord,
+	
+		// The colour to set the fragment
+		out_vec4_FragColour,
+	
+		// The depth to assign to the fragment.
+		out_float_FragDepth,
+		
+		// Not an inbuilt type.
+		None
+	};
+
+	struct ShaderVariableInfo
+	{
+		const char* InterpQual = nullptr;
+		const char* StorageQual = nullptr;
+		const char* Type = nullptr;
+		const char* Name = nullptr;
+		const void* Data = nullptr;
+		uint64_t	Size = 0u;
+		uint64_t	Length = 1u;
+		uint64_t	Location = -1;
 	};
 	
-	struct ShaderLayoutInfo
+	struct ShaderInfo
 	{
-		ShaderField*	Fields;
-		size_t			FieldCount;
-		size_t			Size;
+		ShaderVariableInfo* Variables;
+		size_t				VariableCount;
 	};
+
+	using ShaderProcRunFn	= void(*)();
+	using ShaderProcInfoFn	= ShaderInfo*(*)();
 
 	struct ShaderProcInfo
 	{
-		using RunFn		= void( * )( ShaderLayout* );
-		using InfoFn	= ShaderLayoutInfo*( * )();
-
-		bool		IsMemoryLoaded;
-		const void* Handle;
-		RunFn		Run;
-		InfoFn		Info;
+		const void*				Handle;
+		ShaderProcRunFn			Run;
+		const ShaderInfo*		Info;
 	};
+
+	struct ShaderVariable
+	{
+		EShaderInterpQual	InterQual;
+		EShaderStorageQual	StorageQual;
+		EShaderVarType		VarType;
+		std::string			Name;
+		void*				Data;
+		uint32_t			Location;
+		uint32_t			Size;
+		uint32_t			Length;
+	};
+
+	using ShaderUniformArray	= std::array< std::optional< ShaderVariable	>, MAX_SHADER_UNIFORMS	 >;
+	using ShaderAttributeArray	= std::array< std::optional< ShaderVariable >, MAX_SHADER_ATTRIBUTES >;
+	using ShaderParameterArray	= std::array< std::optional< ShaderVariable >, MAX_SHADER_PARAMETERS >;
 
 	struct Shader
 	{
@@ -266,21 +371,189 @@ namespace ConsoleGL
 		const void*							Buffer;
 		std::shared_ptr< ShaderProcInfo >	Proc;
 		std::vector< ShaderProgramHandle >  AttachedTo;
+		ShaderUniformArray					Uniforms;
+		ShaderAttributeArray				Attributes;
+		ShaderParameterArray				Parameters;
 	};
+
+	using ShaderProgramUniformArray		= std::array< std::optional< ShaderVariable	>, MAX_SHADER_UNIFORMS	 >;
+	using ShaderProgramAttributeArray	= std::array< std::optional< ShaderVariable >, MAX_SHADER_ATTRIBUTES >;
+	using ShaderProgramParameterArray	= std::array< std::optional< ShaderVariable >, MAX_SHADER_PARAMETERS >;
+
+	using VertexInbuiltVarArray		= std::array< void*, ( size_t )EVertexShaderInbuilt::None >;
+	using FragmentInbuiltVarArray	= std::array< void*, ( size_t )EFragmentShaderInbuilt::None >;
 
 	struct ShaderProgramEntry
 	{
-		std::shared_ptr< ShaderProcInfo >	Proc;
-		ShaderHandle						Attached;
+		std::shared_ptr< ShaderProcInfo > Proc;
+		ShaderHandle					  Attached;
 	};
 
 	struct ShaderProgram
 	{
-		ShaderProgramEntry	Entries[ 2u /*ShaderStages*/ ];
-		bool				IsLinked;
+		bool						IsLinked;
+		ShaderProgramEntry			Entries[ SHADER_STAGE_COUNT ];
+		ShaderProgramUniformArray	Uniforms;
+		ShaderProgramAttributeArray Attributes;
+		ShaderProgramParameterArray Parameters;
+		VertexInbuiltVarArray		VertexInbuiltVars;
+		FragmentInbuiltVarArray		FragmentInbuiltVars;
+	};
+
+	struct Context
+	{
+		ShaderProgramHandle	ActiveShaderProgram;
+		ShaderProcRunFn		ShaderEntries[ SHADER_STAGE_COUNT ];
 	};
 }
 
+bool ConvertShaderVar( const ConsoleGL::ShaderVariableInfo& a_ShaderVarInfo, ConsoleGL::ShaderVariable& o_ShaderVar )
+{
+	const std::string InterpQual = a_ShaderVarInfo.InterpQual;
+
+	if ( InterpQual == "" ) o_ShaderVar.InterQual = ConsoleGL::EShaderInterpQual::None;
+	else if ( InterpQual == "affn" ) o_ShaderVar.InterQual = ConsoleGL::EShaderInterpQual::Affine;
+	else if ( InterpQual == "flat" ) o_ShaderVar.InterQual = ConsoleGL::EShaderInterpQual::Flat;
+	else if ( InterpQual == "prsp" ) o_ShaderVar.InterQual = ConsoleGL::EShaderInterpQual::Perspective;
+	else return false;
+
+	const std::string StorageQual = a_ShaderVarInfo.StorageQual;
+
+	if ( StorageQual == "" ) return false;
+	else if ( StorageQual == "out" ) o_ShaderVar.StorageQual = ConsoleGL::EShaderStorageQual::Out;
+	else if ( StorageQual == "in" ) o_ShaderVar.StorageQual = ConsoleGL::EShaderStorageQual::In;
+	else if ( StorageQual == "attrib" ) o_ShaderVar.StorageQual = ConsoleGL::EShaderStorageQual::Attribute;
+	else if ( StorageQual == "uniform" ) o_ShaderVar.StorageQual = ConsoleGL::EShaderStorageQual::Uniform;
+	else return false;
+
+	// If there is a interpolation qualifier, then the storage qualifier must be out.
+	if ( o_ShaderVar.InterQual != ConsoleGL::EShaderInterpQual::None && o_ShaderVar.StorageQual != ConsoleGL::EShaderStorageQual::Out )
+	{
+		return false;
+	}
+
+	// If there is no interpolation qualifier and it's an out variable, then we use the default, perspective.
+	if ( o_ShaderVar.InterQual == ConsoleGL::EShaderInterpQual::None && o_ShaderVar.StorageQual == ConsoleGL::EShaderStorageQual::Out )
+	{
+		o_ShaderVar.InterQual = ConsoleGL::EShaderInterpQual::Perspective;
+	}
+
+	o_ShaderVar.Location = a_ShaderVarInfo.Location == ( uint64_t )-1 ? -1 : a_ShaderVarInfo.Location;
+
+	// Validate that if there is a location, then it is within range.
+	switch ( o_ShaderVar.StorageQual )
+	{
+	case ConsoleGL::EShaderStorageQual::In:
+	case ConsoleGL::EShaderStorageQual::Out:
+		if ( o_ShaderVar.Location != -1 )
+		{
+			return false;
+		}
+		break;
+	case ConsoleGL::EShaderStorageQual::Uniform:
+		if ( o_ShaderVar.Location >= MAX_SHADER_UNIFORMS )
+		{
+			return false;
+		}
+		break;
+	case ConsoleGL::EShaderStorageQual::Attribute:
+		if ( o_ShaderVar.Location >= MAX_SHADER_ATTRIBUTES )
+		{
+			return false;
+		}
+		break;
+	default: break;
+	}
+
+	const std::string VarType = a_ShaderVarInfo.Type;
+
+	if ( VarType == "" ) return false;
+	else if ( VarType == "int8"    ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Int8;
+	else if ( VarType == "int16"   ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Int16;
+	else if ( VarType == "int32"   ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Int32;
+	else if ( VarType == "int64"   ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Int64;
+	else if ( VarType == "uint8"   ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Uint8;
+	else if ( VarType == "uint16"  ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Uint16;
+	else if ( VarType == "uint32"  ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Uint32;
+	else if ( VarType == "uint64"  ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Uint64;
+	else if ( VarType == "float"   ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Float;
+	else if ( VarType == "double"  ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Double;
+	else if ( VarType == "bool"    ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Bool;
+	else if ( VarType == "mat2"    ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Mat2;
+	else if ( VarType == "mat3"    ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Mat3;
+	else if ( VarType == "mat4"    ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Mat4;
+	else if ( VarType == "mat2x3"  ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Mat2x3;
+	else if ( VarType == "mat2x4"  ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Mat2x4;
+	else if ( VarType == "mat3x2"  ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Mat3x2;
+	else if ( VarType == "mat3x4"  ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Mat3x4;
+	else if ( VarType == "mat4x2"  ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Mat4x2;
+	else if ( VarType == "mat4x3"  ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Mat4x3;
+	else if ( VarType == "dmat2"   ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Dmat2;
+	else if ( VarType == "dmat3"   ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Dmat3;
+	else if ( VarType == "dmat4"   ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Dmat4;
+	else if ( VarType == "dmat2x3" ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Dmat2x3;
+	else if ( VarType == "dmat2x4" ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Dmat2x4;
+	else if ( VarType == "dmat3x2" ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Dmat3x2;
+	else if ( VarType == "dmat3x4" ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Dmat3x4;
+	else if ( VarType == "dmat4x2" ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Dmat4x2;
+	else if ( VarType == "dmat4x3" ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Dmat4x3;
+	else if ( VarType == "vec2"    ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Vec2;
+	else if ( VarType == "vec3"    ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Vec3;
+	else if ( VarType == "vec4"    ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Vec4;
+	else if ( VarType == "dvec2"   ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Dvec2;
+	else if ( VarType == "dvec3"   ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Dvec3;
+	else if ( VarType == "dvec4"   ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Dvec4;
+	else if ( VarType == "ivec2"   ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Ivec2;
+	else if ( VarType == "ivec3"   ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Ivec3;
+	else if ( VarType == "ivec4"   ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Ivec4;
+	else if ( VarType == "uvec2"   ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Uvec2;
+	else if ( VarType == "uvec3"   ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Uvec3;
+	else if ( VarType == "uvec4"   ) o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Uvec4;
+	else o_ShaderVar.VarType = ConsoleGL::EShaderVarType::Custom;
+
+	o_ShaderVar.Name = a_ShaderVarInfo.Name;
+
+	if ( o_ShaderVar.Name == "" )
+	{
+		return false;
+	}
+
+	o_ShaderVar.Data = const_cast< void* >( a_ShaderVarInfo.Data );
+
+	if ( o_ShaderVar.Data == nullptr )
+	{
+		return false;
+	}
+
+	o_ShaderVar.Size = a_ShaderVarInfo.Size;
+
+	if ( o_ShaderVar.Size == 0u )
+	{
+		return false;
+	}
+
+	o_ShaderVar.Length = a_ShaderVarInfo.Length;
+
+	if ( o_ShaderVar.Length == 0u )
+	{
+		return false;
+	}
+
+	return true;
+}
+
+ConsoleGL::EVertexShaderInbuilt TryConvertVertexShaderInbuilt( const ConsoleGL::ShaderVariable& a_ShaderVar )
+{
+	return ConsoleGL::EVertexShaderInbuilt::None;
+}
+
+// Define destructor functions for each object.
+void DestructorWindow( ConsoleGL::Window* a_Window ) {}
+void DestructorContext( ConsoleGL::Context* a_Context ) {}
+void DestructorShader( ConsoleGL::Shader* a_Shader ) {}
+void DestructorShaderProgram( ConsoleGL::ShaderProgram* a_ShaderProgram ) {}
+
+// Define repositories for each object.
 DEFINE_REPOSITORY( Window, WINDOW_MAX_COUNT );
 DEFINE_REPOSITORY( Context, CONTEXT_MAX_COUNT );
 DEFINE_REPOSITORY( Shader, SHADER_MAX_COUNT );
@@ -325,7 +598,7 @@ bool BorrowWindow( const ConsoleGL::WindowHandle a_Window )
     }
 
     ENSURE_LOG( !( State.ActiveWindow && !ReturnWindow( State.ActiveWindow ) ), "Failed to return currently borrowed console window." );
-	ENSURE_LOG( AttachConsole( a_Window->InternalInfo->ProcessInfo.dwProcessId ), "Failed to attach console window." );
+	ENSURE_LOG( AttachConsole( a_Window->ProcessInfo.dwProcessId ), "Failed to attach console window." );
 
     // Set command.
     ConsoleGL::WindowDockCommandBuffer* Buffer = ( ConsoleGL::WindowDockCommandBuffer* )a_Window->CommandBuffer.Data();
@@ -388,10 +661,9 @@ ConsoleGL::Window* ConsoleGL::CreateWindow( const char* a_Title, const uint32_t 
         return nullptr;
     }
 
-    Created->InternalInfo = std::make_shared< InternalInfo >();
-    ZeroMemory( &Created->InternalInfo->StartupInfo, sizeof( Created->InternalInfo->StartupInfo ) );
-    Created->InternalInfo->StartupInfo.cb = sizeof( Created->InternalInfo->StartupInfo );
-    ZeroMemory( &Created->InternalInfo->ProcessInfo, sizeof( Created->InternalInfo->ProcessInfo ) );
+    ZeroMemory( &Created->StartupInfo, sizeof( Created->StartupInfo ) );
+    Created->StartupInfo.cb = sizeof( Created->StartupInfo );
+    ZeroMemory( &Created->ProcessInfo, sizeof( Created->ProcessInfo ) );
 
     bool FailedToWriteConsoleDockExe = false;
 
@@ -419,15 +691,14 @@ ConsoleGL::Window* ConsoleGL::CreateWindow( const char* a_Title, const uint32_t 
         CREATE_NEW_CONSOLE,
         nullptr,
         nullptr,
-        &Created->InternalInfo->StartupInfo,
-        &Created->InternalInfo->ProcessInfo ) )
+        &Created->StartupInfo,
+        &Created->ProcessInfo ) )
 
     {
 	    Created->CommandBuffer.Clear();
         Created->CommandReady.Clear();
         Created->CommandComplete.Clear();
         Created->ProcessStarted.Clear();
-        Created->InternalInfo.reset();
 		State.Windows.Destroy( Created );
         Error::SetLastError( Error_WindowDockCreationFailure );
         return nullptr;
@@ -439,9 +710,8 @@ ConsoleGL::Window* ConsoleGL::CreateWindow( const char* a_Title, const uint32_t 
         Created->CommandReady.Clear();
         Created->CommandComplete.Clear();
         Created->ProcessStarted.Clear();
-        Created->InternalInfo.reset();
 
-        ENSURE_LOG( TerminateProcess( Created->InternalInfo->ProcessInfo.hProcess, 1 ), "Failed to terminate console dock process." );
+        ENSURE_LOG( TerminateProcess( Created->ProcessInfo.hProcess, 1 ), "Failed to terminate console dock process." );
 		State.Windows.Destroy( Created );
         Error::SetLastError( Error_WindowDockCreationFailure );
     }
@@ -452,7 +722,7 @@ ConsoleGL::Window* ConsoleGL::CreateWindow( const char* a_Title, const uint32_t 
 
     // Borrow the new docked window.
 	ENSURE_LOG( BorrowWindow( Created ), "Could not borrow window." );
-    Created->InternalInfo->WindowHandle = GetConsoleWindow();
+    Created->WindowHandle = GetConsoleWindow();
 
     const HANDLE StdOutputHandle = GetStdHandle( STD_OUTPUT_HANDLE );
     const HANDLE StdInputHandle = GetStdHandle( STD_INPUT_HANDLE );
@@ -487,7 +757,6 @@ ConsoleGL::Window* ConsoleGL::CreateWindow( const char* a_Title, const uint32_t 
 
     // Set Physical Console Window Size
 	WindowRect = { 0, 0, ( SHORT )( a_Width - 1 ), ( SHORT )( a_Height - 1 ) };
-    Created->InternalInfo->WindowRegion = WindowRect;
 	ENSURE_LOG( SetConsoleWindowInfo( StdOutputHandle, true, &WindowRect ), "Failed to set console window info." );
     ENSURE_LOG( SetConsoleMode( StdInputHandle, ENABLE_EXTENDED_FLAGS | ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT ), "Failed to set console mode." );
     ENSURE_LOG( SetConsoleTitleA( a_Title ), "Failed to set console title." );
@@ -527,7 +796,7 @@ bool ConsoleGL::DestroyWindow( const WindowHandle a_Window )
 
 bool ConsoleGL::SetActiveWindow( const WindowHandle a_Window )
 {
-	if ( a_Window && State.Windows.IsValid( a_Window ) )
+	if ( a_Window && !State.Windows.IsValid( a_Window ) )
 	{
 		Error::SetLastError( Error_InvalidWindowHandle );
 		return false;
@@ -735,12 +1004,14 @@ bool ConsoleGL::SwapWindowBuffer()
         }
     }
 
+	SMALL_RECT WindowRegion = { 0, 0, State.ActiveWindow->Width - 1, State.ActiveWindow->Height - 1 };
+
     if ( !WriteConsoleOutput(
         GetStdHandle( STD_OUTPUT_HANDLE ),
         ( CHAR_INFO* )State.ActiveWindow->Buffers[ IndexToDraw ].GetPixels(),
         { ( SHORT )State.ActiveWindow->Width, ( SHORT )State.ActiveWindow->Height },
         { 0, 0 },
-        &State.ActiveWindow->InternalInfo->WindowRegion ) )
+        &WindowRegion ) )
     {
 	    Error::SetLastError( Error_WindowBufferWriteFailure );
 		return false;
@@ -1075,7 +1346,7 @@ bool ConsoleGL::PollEvents()
     // Get the current mouse position.
     POINT Coordinates{ 0, 0 };
 
-	if ( !GetCursorPos( &Coordinates ) || !ScreenToClient( State.ActiveWindow->InternalInfo->WindowHandle, &Coordinates ) )
+	if ( !GetCursorPos( &Coordinates ) || !ScreenToClient( State.ActiveWindow->WindowHandle, &Coordinates ) )
 	{
 		MouseX = 0.0f;
 		MouseY = 0.0f;
@@ -1538,28 +1809,29 @@ bool ConsoleGL::CompileShader( const ShaderHandle a_Shader )
 	};
 #endif
 
-	auto MakeProcInfo = []( const bool a_IsMemoryLoaded, const void* a_Handle, const ShaderProcInfo::RunFn a_Run, const ShaderProcInfo::InfoFn a_Info )
+	auto MakeProcInfo = []( const bool a_IsMemoryLoaded, const void* a_Handle, const ShaderProcRunFn a_Run, const ShaderInfo* a_Info )
 	{
 		ShaderProcInfo* ProcInfo = new ShaderProcInfo;
-		ProcInfo->IsMemoryLoaded = a_IsMemoryLoaded;
 		ProcInfo->Handle = a_Handle;
 		ProcInfo->Run = a_Run;
 		ProcInfo->Info = a_Info;
 
-		return std::shared_ptr< ShaderProcInfo >( ProcInfo, +[]( const ShaderProcInfo* a_ProcInfo )
+		const auto MemoryDestructor = +[]( const ShaderProcInfo* a_ProcInfo )
 		{
-			if ( a_ProcInfo->IsMemoryLoaded )
-			{
-				MemoryFreeLibrary( ( HMEMORYMODULE )a_ProcInfo->Handle );
-			}
-			else
-			{
-				FreeLibrary( ( HMODULE )a_ProcInfo->Handle );
-			}
-		} );
+			MemoryFreeLibrary( ( HMEMORYMODULE )a_ProcInfo->Handle );
+		};
+
+		const auto Destructor = +[]( const ShaderProcInfo* a_ProcInfo )
+		{
+			FreeLibrary( ( HMODULE )a_ProcInfo->Handle );
+		};
+
+		return std::shared_ptr< ShaderProcInfo >( ProcInfo, a_IsMemoryLoaded ? MemoryDestructor : Destructor );
 	};
+
+	Shader Temp = *a_Shader;
 		
-	switch ( a_Shader->SourceType )
+	switch ( Temp.SourceType )
 	{
 	case EShaderSourceType::MemorySource:
 	{
@@ -1577,10 +1849,10 @@ bool ConsoleGL::CompileShader( const ShaderHandle a_Shader )
 				return false;
 			}
 
-			ShaderFile.write( a_Shader->Source.c_str(), a_Shader->Source.size() );
+			ShaderFile.write( Temp.Source.c_str(), Temp.Source.size() );
 		}
 
-		a_Shader->File = SourceFile;
+		Temp.File = SourceFile;
 #else
 		return false;
 #endif
@@ -1588,7 +1860,7 @@ bool ConsoleGL::CompileShader( const ShaderHandle a_Shader )
 	case EShaderSourceType::FileSource:
 	{
 #if IS_CONSOLEGL
-		const std::string SourceFile = a_Shader->File.c_str();
+		const std::string SourceFile = Temp.File.c_str();
 		const std::string OutputFile = std::filesystem::path{ SourceFile }.replace_extension( "cglshader" ).string();
 
 		// Attempt to compile the source file. If it failed, error will be set internally.
@@ -1599,14 +1871,14 @@ bool ConsoleGL::CompileShader( const ShaderHandle a_Shader )
 
 		// If this case is a fall through of the above case, then this means the source file is a temp file and
 		// should be deleted after being compiled.
-		if ( a_Shader->SourceType == EShaderSourceType::MemorySource && !std::filesystem::remove( a_Shader->File ) )
+		if ( Temp.SourceType == EShaderSourceType::MemorySource && !std::filesystem::remove( Temp.File ) )
 		{
 			Error::SetLastError( Error_ShaderSourceFileCleanupFailure );
 			return false;
 		}
 
 		// Now that the source file has been compiled, we can upgrade this source.
-		a_Shader->File = OutputFile;
+		Temp.File = OutputFile;
 #else
 		return false;
 #endif
@@ -1614,9 +1886,9 @@ bool ConsoleGL::CompileShader( const ShaderHandle a_Shader )
 	case EShaderSourceType::FileCompiled:
 	{
 		// If the type is FileCompiled, then we want to just load the library directly from the file, because this was a user-provided file.
-		if ( a_Shader->SourceType == EShaderSourceType::FileCompiled )
+		if ( Temp.SourceType == EShaderSourceType::FileCompiled )
 		{
-			const HMODULE ShaderHandle = LoadLibraryA( a_Shader->File.c_str() );
+			const HMODULE ShaderHandle = LoadLibraryA( Temp.File.c_str() );
 
 			if ( !ShaderHandle )
 			{
@@ -1641,13 +1913,13 @@ bool ConsoleGL::CompileShader( const ShaderHandle a_Shader )
 			}
 
 			// Setup proc info.
-			a_Shader->Proc = MakeProcInfo( false, ShaderHandle, ( ShaderProcInfo::RunFn )ShaderRun, ( ShaderProcInfo::InfoFn )ShaderInfo );
-			return true;
+			Temp.Proc = MakeProcInfo( false, ShaderHandle, ( ShaderProcRunFn )ShaderRun, ( ( ShaderProcInfoFn )ShaderInfo )() );
+			break;
 		}
 
 		// If the type if FileSource or MemorySource, this means we've made a temporarily compiled file to load binary from, and delete after.
 		{
-			std::ifstream ShaderFile( a_Shader->File, std::ios::binary | std::ios::in );
+			std::ifstream ShaderFile( Temp.File, std::ios::binary | std::ios::in );
 
 			if ( !ShaderFile.is_open() )
 			{
@@ -1655,26 +1927,26 @@ bool ConsoleGL::CompileShader( const ShaderHandle a_Shader )
 				return false;
 			}
 
-			const size_t ShaderFileSize = std::filesystem::file_size( a_Shader->File );
-			a_Shader->Binary.resize( ShaderFileSize );
+			const size_t ShaderFileSize = std::filesystem::file_size( Temp.File );
+			Temp.Binary.resize( ShaderFileSize );
 			
-			ShaderFile.read( ( char* )a_Shader->Binary.data(), ShaderFileSize );
-			a_Shader->Buffer = a_Shader->Binary.data();
-			a_Shader->BufferSize = ShaderFileSize;
+			ShaderFile.read( ( char* )Temp.Binary.data(), ShaderFileSize );
+			Temp.Buffer = Temp.Binary.data();
+			Temp.BufferSize = ShaderFileSize;
 		}
 
 		// We have loaded the binary, now we can delete the compiled temp file.
-		if ( !std::filesystem::remove( a_Shader->File ) )
+		if ( !std::filesystem::remove( Temp.File ) )
 		{
 			Error::SetLastError( Error_ShaderBinaryFileCleanupFailure );
 			return false;
 		}
 
-		a_Shader->File = "";
+		Temp.File = "";
 	}
 	case EShaderSourceType::MemoryCompiled:
 	{
-		const HMEMORYMODULE ShaderHandle = MemoryLoadLibrary( a_Shader->Buffer, a_Shader->BufferSize );
+		const HMEMORYMODULE ShaderHandle = MemoryLoadLibrary( Temp.Buffer, Temp.BufferSize );
 		
 		if ( !ShaderHandle )
 		{
@@ -1698,12 +1970,51 @@ bool ConsoleGL::CompileShader( const ShaderHandle a_Shader )
 			return false;
 		}
 
-		a_Shader->Proc = MakeProcInfo( true, ShaderHandle, ( ShaderProcInfo::RunFn )ShaderRun, ( ShaderProcInfo::InfoFn )ShaderInfo );
-		return true;
+		Temp.Proc = MakeProcInfo( true, ShaderHandle, ( ShaderProcRunFn )ShaderRun, ( ( ShaderProcInfoFn )ShaderInfo )() );
+		break;
 	}
 	default: break;
 	}
 
+
+	bool Error = false;
+
+	// For each field, we want to fill out the shader variable info.
+	const size_t FieldCount = Temp.Proc->Info->VariableCount;
+	uint32_t ParamIndex = 0u;
+
+	for ( uint32_t i = 0u; i < FieldCount; ++i )
+	{
+		if ( ShaderVariable Var; !ConvertShaderVar( Temp.Proc->Info->Variables[ i ], Var ) )
+		{
+			// Error
+			Error = true;
+		}
+		else
+		{
+			switch ( Var.StorageQual )
+			{
+			case EShaderStorageQual::Uniform:
+				Temp.Uniforms[ Var.Location ] = std::move( Var );
+				break;
+			case EShaderStorageQual::Attribute:
+				Temp.Attributes[ Var.Location ] = std::move( Var );
+				break;
+			case EShaderStorageQual::In:
+			case EShaderStorageQual::Out:
+				Temp.Parameters[ ParamIndex++ ] = std::move( Var );
+				break;
+			}
+		}
+	}
+
+	if ( Error )
+	{
+		Error::SetLastError( Error_ShaderCompileError );
+		return false;
+	}
+
+	*a_Shader = std::move( Temp );
 	return true;
 }
 
@@ -1781,13 +2092,13 @@ bool ConsoleGL::LinkProgram( const ShaderProgramHandle a_ShaderProgram )
 		return false;
 	}
 
-	ClearShaderInfoLog();
+	ClearShaderProgramInfoLog();
 	bool LinkFailure = false;
 
 	// We need to verify the state of all shader entries.
 	// For entries that are mandatory, there needs to be one,
 	// and for all entries that are there, they need to be compiled.
-	for ( size_t i = 0; i < 2u; ++i )
+	for ( size_t i = 0; i < SHADER_STAGE_COUNT; ++i )
 	{
 		const auto& Entry = a_ShaderProgram->Entries[ i ];
 
@@ -1795,14 +2106,14 @@ bool ConsoleGL::LinkProgram( const ShaderProgramHandle a_ShaderProgram )
 		{
 		case EShaderType::Vertex:
 		{
-			if ( !Entry.Attached ) LinkFailure = true, WriteToShaderInfoLog( "No vertex shader attached.\n" );
-			else if ( !IsShaderCompiled( Entry.Attached ) ) LinkFailure = true, WriteToShaderInfoLog( "Vertex shader is not compiled.\n" );
+			if ( !Entry.Attached ) LinkFailure = true, WriteToShaderProgramInfoLog( "No vertex shader attached.\n" );
+			else if ( !IsShaderCompiled( Entry.Attached ) ) LinkFailure = true, WriteToShaderProgramInfoLog( "Vertex shader is not compiled.\n" );
 			break;
 		}
 		case EShaderType::Fragment:
 		{
-			if ( !Entry.Attached ) LinkFailure = true, WriteToShaderInfoLog( "No fragment shader attached.\n" );
-			else if ( !IsShaderCompiled( Entry.Attached ) ) LinkFailure = true, WriteToShaderInfoLog( "Fragment shader is not compiled.\n" );
+			if ( !Entry.Attached ) LinkFailure = true, WriteToShaderProgramInfoLog( "No fragment shader attached.\n" );
+			else if ( !IsShaderCompiled( Entry.Attached ) ) LinkFailure = true, WriteToShaderProgramInfoLog( "Fragment shader is not compiled.\n" );
 			break;
 		}
 		}
@@ -1814,10 +2125,46 @@ bool ConsoleGL::LinkProgram( const ShaderProgramHandle a_ShaderProgram )
 		return false;
 	}
 
+	// Let's now verify all Shader fields and make sure it all lines up.
+	// 1. Uniforms with the same name on all shader stages should be the same location and type.
+	// 2. Attributes with the same name on all shader stages must have the same location and type.
+	// 3. Out parameters on Vertex need to be matched with In on Fragment and be same type.
+
+	const ShaderHandle VertexShader = a_ShaderProgram->Entries[ ( size_t )EShaderType::Vertex ].Attached;
+	const ShaderHandle FragmentShader = a_ShaderProgram->Entries[ ( size_t )EShaderType::Fragment ].Attached;
+
+#pragma region VariableChecks
+
+
+
+	
+#pragma endregion
+
+	// If there were any link failures after the above step, we should fail here.
+	if ( LinkFailure )
+	{
+		Error::SetLastError( Error_ShaderProgramLinkFailure );
+		return false;
+	}
+
+	// We need to setup shader program uniforms, attributes and parameters.
+
+
 	// We can now copy across proc infos.
 	for ( auto& Entry : a_ShaderProgram->Entries )
 	{
 		Entry.Proc = Entry.Attached->Proc;
+	}
+
+	// Linking a program that's currently in use is allowed.
+	// So since this linking was successful, we want to set the active
+	// entry points to these new entries.
+	if ( State.ActiveContext && State.ActiveContext->ActiveShaderProgram == a_ShaderProgram )
+	{
+		for ( size_t i = 0u; i < SHADER_STAGE_COUNT; ++i )
+		{
+			State.ActiveContext->ShaderEntries[ i ] = a_ShaderProgram->Entries[ i ].Proc->Run;
+		}
 	}
 
 	return a_ShaderProgram->IsLinked = true;
@@ -1965,6 +2312,49 @@ bool ConsoleGL::DeleteProgram( const ShaderProgramHandle a_ShaderProgram )
 	return State.ShaderPrograms.Destroy( a_ShaderProgram );
 }
 
+bool ConsoleGL::UseProgram( const ShaderProgramHandle a_ShaderProgram )
+{
+	if ( !State.ActiveContext )
+	{
+		Error::SetLastError( Error_NoActiveContext );
+		return false;
+	}
+
+	// If this is a nullptr, then it means we want to clear out the current program.
+	if ( !a_ShaderProgram )
+	{
+		State.ActiveContext->ActiveShaderProgram = nullptr;
+
+		for ( auto& Entry : State.ActiveContext->ShaderEntries )
+		{
+			Entry = nullptr;
+		}
+
+		return true;
+	}
+
+	if ( !State.ShaderPrograms.IsValid( a_ShaderProgram ) )
+	{
+		Error::SetLastError( Error_InvalidShaderProgramHandle );
+		return false;
+	}
+
+	if ( !a_ShaderProgram->IsLinked )
+	{
+		Error::SetLastError( Error_ShaderProgramNotLinked );
+		return false;
+	}
+
+	State.ActiveContext->ActiveShaderProgram = a_ShaderProgram;
+
+	for ( size_t i = 0u; i < SHADER_STAGE_COUNT; ++i )
+	{
+		State.ActiveContext->ShaderEntries[ i ] = a_ShaderProgram->Entries[ i ].Proc->Run;
+	}
+
+	return true;
+}
+
 #pragma endregion
 
 
@@ -1992,7 +2382,7 @@ bool ConsoleGL::DeleteProgram( const ShaderProgramHandle a_ShaderProgram )
 
 void ConsoleGL::RunTest()
 {
-	int Width = 100, Height = 100;
+	int Width = 160, Height = 90;
 
 	// Create window.
 	ConsoleGL::Window* window0 = ConsoleGL::CreateWindow( "window0", Width, Height, 8, 8, 2 );
@@ -2009,20 +2399,22 @@ void ConsoleGL::RunTest()
 	// Create vertex shader.
 	ConsoleGL::Shader* DefaultVertexShader = ConsoleGL::CreateShader( ConsoleGL::EShaderType::Vertex );
 	const std::string VertexShaderSource = R"(
-struct Layout
-{
-	mat4 uni_PV;
-	mat4 uni_M;
-	vec4 in_ddPosition;
-	vec4 out_Position;
-	//vec4 out_Position;
-	vec2 attr10_Rotations;
-	vec4 out_FragColour;
-};
 
-void run( Layout* layout )
+uniform(0) mat4 P;
+uniform(1) mat4 V;
+uniform(3) mat4 M;
+
+attrib(0) vec3 Position;
+attrib(1) vec3 Normal;
+attrib(2) vec3 Colour;
+
+out vec4 VertPos;
+flat out vec3 FaceColour;
+affn out vec2 UV;
+
+void run()
 {
-	layout->out_Position = layout->uni_PV * layout->uni_M * layout->out_FragColour;
+	VertPos = P * V * M * vec4(Position, 1.0f);
 }
 )";
 
@@ -2033,20 +2425,15 @@ void run( Layout* layout )
 	// Create fragment shader.
 	ConsoleGL::Shader* DefaultFragmentShader = ConsoleGL::CreateShader( ConsoleGL::EShaderType::Fragment );
 	const std::string FragmentShaderSource = R"(
-struct Layout
-{
-	mat4 uni_PV;
-	mat4 uni_M;
-	vec4 in_ddPosition;
-	vec4 out_Position;
-	//vec4 out_Position;
-	vec2 attr10_Rotations;
-	vec4 out_FragColour;
-};
 
-void run( Layout* layout )
+in vec4 FaceColour;
+in vec2 UV;
+in vec4 FragColour;
+in vec4 FragDepth;
+
+void run()
 {
-	layout->out_Position = layout->uni_PV * layout->uni_M * layout->out_FragColour;
+	FragColour = FaceColour;
 }
 )";
 
@@ -2056,34 +2443,12 @@ void run( Layout* layout )
 
 	// Link the shader program.
 	ConsoleGL::LinkProgram( DefaultShaderProgram );
+
 	ConsoleGL::DetachShader( DefaultShaderProgram, DefaultVertexShader );
 	ConsoleGL::DeleteShader( DefaultVertexShader );
 	ConsoleGL::DetachShader( DefaultShaderProgram, DefaultFragmentShader );
 	ConsoleGL::DeleteShader( DefaultFragmentShader );
 
-
-
-	using func_type = ShaderLayoutInfo*(*)();
-
-	func_type func = (func_type)DefaultShaderProgram->Entries[(size_t)EShaderType::Fragment].Proc->Info;
-
-	auto* f = func();
-
-	for ( int i = 0; i < f->FieldCount; ++i )
-	{
-		f->Fields[ i ].Name;
-	}
-
-	while ( true )
-	{
-		/*float Colourf[3];
-		func(Colourf);
-
-		Colour col{ Colourf[ 0 ], Colourf[ 1 ], Colourf[ 2 ] };
-		Pixel pix = *MapColourToPixel( col );
-
-		auto buff0 = GetWindowBuffer(window0);
-		SetBuffer(buff0, pix);
-		SwapWindowBuffer();*/
-	}
+	// Use the program now for current context.
+	ConsoleGL::UseProgram( DefaultShaderProgram );
 }

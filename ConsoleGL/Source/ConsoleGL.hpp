@@ -19,7 +19,12 @@
 #define SHADER_MAX_COUNT 32
 #define SHADER_PROGRAM_MAX_COUNT 32
 
+#define MAX_SHADER_UNIFORMS 32
+#define MAX_SHADER_ATTRIBUTES 32
+#define MAX_SHADER_PARAMETERS 32
+
 #define SHADER_INFO_LOG_MAX 4096
+#define SHADER_PROGRAM_INFO_LOG_MAX 4096
 
 namespace ConsoleGL
 {
@@ -75,8 +80,10 @@ namespace ConsoleGL
 		Error_ShaderInfoEntryNotFound,
 		Error_ShaderAlreadyCompiled,
 		Error_ShaderProgramAlreadyLinked,
+		Error_ShaderProgramNotLinked,
 		Error_ShaderProgramLinkFailure,
-		Error_NoShaderOfType
+		Error_NoShaderOfType,
+		Error_ShaderCompileError
 	};
 
 	enum class EKeyboardKey : uint8_t
@@ -488,12 +495,12 @@ namespace ConsoleGL
 	CONSOLEGL_API bool DeleteShader( ShaderHandle a_Shader );
 	CONSOLEGL_API bool DeleteProgram( ShaderProgramHandle a_ShaderProgram );
 	//CONSOLEGL_API void Init();
-	//CONSOLEGL_API void GenBuffers( uint32_t a_Count, BufferHandle* a_Handles );
+	//CONSOLEGL_API void CreateBuffers( uint32_t a_Count, BufferHandle* a_Handles );
 	//CONSOLEGL_API void BindBuffer( BufferTarget a_BufferBindingTarget, BufferHandle a_Handle );
 	//CONSOLEGL_API void DeleteBuffers( uint32_t a_Count, BufferHandle* a_Handles );
 	//CONSOLEGL_API bool IsBuffer( BufferHandle a_Handle );
 	//CONSOLEGL_API bool ViewPort( size_t a_X, size_t a_Y, size_t a_Width, size_t a_Height );
-	//CONSOLEGL_API void UseProgram( ShaderProgramHandle a_ShaderProgramHandle );
+	CONSOLEGL_API bool UseProgram( ShaderProgramHandle a_ShaderProgram );
 	//CONSOLEGL_API void Clear( uint8_t a_Flags );
 	//CONSOLEGL_API void ClearColour( float a_R, float a_G, float a_B, float a_A );
 	//CONSOLEGL_API void ClearDepth( float a_ClearDepth );
@@ -529,7 +536,7 @@ namespace ConsoleGL
 	//CONSOLEGL_API void TextureParameterui( TextureHandle a_Handle, TextureParameter a_TextureParameter, uint32_t a_Value );
 	//CONSOLEGL_API void TextureParameterui( TextureHandle a_Handle, TextureParameter a_TextureParameter, const uint32_t* a_Value );
 	//CONSOLEGL_API void TexImage2D( TextureTarget a_TextureTarget, uint8_t a_MipMapLevel, TextureFormat a_InternalFormat, int32_t a_Width, int32_t a_Height, int32_t a_Border, TextureFormat a_TextureFormat, TextureSetting a_DataLayout, const void* a_Data );
-	//CONSOLEGL_API int32_t GetUniformLocation( ShaderProgramHandle a_ShaderProgramHandle, const char* a_Name );
+	CONSOLEGL_API int32_t GetUniformLocation( ShaderProgramHandle a_ShaderProgram, const char* a_Name );
 	//CONSOLEGL_API void Uniform1f( int32_t a_Location, float a_V0 );
 	//CONSOLEGL_API void Uniform2f( int32_t a_Location, float a_V0, float a_V1 );
 	//CONSOLEGL_API void Uniform3f( int32_t a_Location, float a_V0, float a_V1, float a_V2 );
