@@ -544,6 +544,25 @@ bool ConvertShaderVar( const ConsoleGL::ShaderVariableInfo& a_ShaderVarInfo, Con
 
 ConsoleGL::EVertexShaderInbuilt TryConvertVertexShaderInbuilt( const ConsoleGL::ShaderVariable& a_ShaderVar )
 {
+	for ( uint32 i = 0u; i < ( uint32_t )ConsoleGL::EVertexShaderInbuilt; ++i )
+	{
+		switch ( ( ConsoleGL::EVertexShaderInbuilt )i )
+		{
+		case ConsoleGL::VertexShaderInbuilt::out_vec4_VertPosition:
+		{
+			if ( 
+				a_ShaderVar.InterpQual == EShaderInterpQual::None &&
+				a_ShaderVar.StorageQual == EShaderStorageQual::Out &&
+				a_ShaderVar.VarType == EShaderVarTypr::Vec4 &&
+				a_ShaderVar.Name == "VertPos" )
+			{
+				return ConsoleGL::VertexShaderInbuilt::out_vec4_VertPosition;
+			}
+		}
+			default: break;
+		}
+	}
+		
 	return ConsoleGL::EVertexShaderInbuilt::None;
 }
 
@@ -2106,14 +2125,30 @@ bool ConsoleGL::LinkProgram( const ShaderProgramHandle a_ShaderProgram )
 		{
 		case EShaderType::Vertex:
 		{
-			if ( !Entry.Attached ) LinkFailure = true, WriteToShaderProgramInfoLog( "No vertex shader attached.\n" );
-			else if ( !IsShaderCompiled( Entry.Attached ) ) LinkFailure = true, WriteToShaderProgramInfoLog( "Vertex shader is not compiled.\n" );
+			if ( !Entry.Attached )
+			{
+				LinkFailure = true;
+				WriteToShaderProgramInfoLog( "No vertex shader attached.\n" );
+			}
+			else if ( !IsShaderCompiled( Entry.Attached ) ) 
+			{
+				LinkFailure = true;
+				WriteToShaderProgramInfoLog( "Vertex shader is not compiled.\n" );
+			}
 			break;
 		}
 		case EShaderType::Fragment:
 		{
-			if ( !Entry.Attached ) LinkFailure = true, WriteToShaderProgramInfoLog( "No fragment shader attached.\n" );
-			else if ( !IsShaderCompiled( Entry.Attached ) ) LinkFailure = true, WriteToShaderProgramInfoLog( "Fragment shader is not compiled.\n" );
+			if ( !Entry.Attached ) 
+			{
+				LinkFailure = true;
+				WriteToShaderProgramInfoLog( "No fragment shader attached.\n" );
+			}
+			else if ( !IsShaderCompiled( Entry.Attached ) ) 
+			{
+				LinkFailure = true;
+				WriteToShaderProgramInfoLog( "Fragment shader is not compiled.\n" );
+			}
 			break;
 		}
 		}
@@ -2134,10 +2169,50 @@ bool ConsoleGL::LinkProgram( const ShaderProgramHandle a_ShaderProgram )
 	const ShaderHandle FragmentShader = a_ShaderProgram->Entries[ ( size_t )EShaderType::Fragment ].Attached;
 
 #pragma region VariableChecks
+       // Need to check that all uniforms in specific slots are
+	// the same name and type.
 
+	for ( uint32_t i = 0u; i < MAX_UNIFORM_COUNT; ++i )
+	{
+		if ( VertexShader->Uniforms[ i ].has_value() && FragmentShader->Uniforms[ i ].has_value() )
+		{
+			if ( VertexShader->Uniforms[ i ].value().Name != FragmentShader->Uniforms[ i ].value().Name )
+			{
+				// Error
+				Error = true;
+			}
 
+			if ( VertexShader->Uniforms[ i ].value().VarType != FragmentShader->Uniforms[ i ].value().VarType )
+			{
+				// Error
+				Error = true;
+			}
+		}
+	}
 
-	
+	for ( uint32_t i = 0u; i < MAX_ATTRIBUTE_COUNT; ++i )
+	{
+		if ( VertexShader->Attributes[ i ].has_value() && FragmentShader->Attributes[ i ].has_value() )
+		{
+			if ( VertexShader->Attributes[ i ].value().Name != FragmentShader->Attributes[ i ].value().Name )
+			{
+				// Error
+				Error = true;
+			}
+
+			if ( VertexShader->Attributes[ i ].value().VarType != FragmentShader->Attributes[ i ].value().VarType )
+			{
+				// Error
+				Error = true;
+			}
+		}
+	}
+
+	for ( uint32_t i = 0u; i < MAX_PARAMETER_COUNT; ++i )
+	{
+		VertexShader->Parameters[ i ];
+	}
+
 #pragma endregion
 
 	// If there were any link failures after the above step, we should fail here.
@@ -2148,7 +2223,7 @@ bool ConsoleGL::LinkProgram( const ShaderProgramHandle a_ShaderProgram )
 	}
 
 	// We need to setup shader program uniforms, attributes and parameters.
-
+        
 
 	// We can now copy across proc infos.
 	for ( auto& Entry : a_ShaderProgram->Entries )
