@@ -18,6 +18,8 @@
 #define CONTEXT_MAX_COUNT 32
 #define SHADER_MAX_COUNT 32
 #define SHADER_PROGRAM_MAX_COUNT 32
+#define SHADER_BUFFER_MAX_COUNT 32
+#define SHADER_VERTEX_ARRAY_MAX_COUNT 32
 
 #define MAX_SHADER_UNIFORMS 32
 #define MAX_SHADER_ATTRIBUTES 32
@@ -32,6 +34,10 @@ namespace ConsoleGL
 	struct Context;
 	struct Shader;
 	struct ShaderProgram;
+	struct Buffer;
+	struct VertexArray;
+	struct Colour;
+	struct Pixel;
 
 	class PixelBuffer;
 
@@ -39,6 +45,8 @@ namespace ConsoleGL
 	using ContextHandle = Context*;
 	using ShaderHandle = Shader*;
 	using ShaderProgramHandle = ShaderProgram*;
+	using BufferHandle = Buffer*;
+	using VertexArrayHandle = VertexArray*;
 
 	enum EError
 	{
@@ -61,11 +69,15 @@ namespace ConsoleGL
 		Error_ContextCapacityReached,
 		Error_ShaderCapacityReached,
 		Error_ShaderProgramCapacityReached,
+		Error_BufferCapacityReached,
+		Error_VertexArrayCapacityReached,
 
 		Error_InvalidWindowHandle,
 		Error_InvalidContextHandle,
 		Error_InvalidShaderHandle,
 		Error_InvalidShaderProgramHandle,
+		Error_InvalidBufferHandle,
+		Error_InvalidVertexArrayHandle,
 		Error_InvalidWindowBufferIndex,
 
 		Error_ShaderCompilerWriteFailure,
@@ -83,7 +95,19 @@ namespace ConsoleGL
 		Error_ShaderProgramNotLinked,
 		Error_ShaderProgramLinkFailure,
 		Error_NoShaderOfType,
-		Error_ShaderCompileError
+		Error_ShaderCompileError,
+		Error_InvalidUniformLocation,
+		Error_InvalidAttrributeLocation,
+		Error_UnsupportedAttribPointerType,
+		Error_UnsupportedDataType,
+		Error_UnsupportedRenderMode,
+
+		Error_UniformIndexOutOfRange,
+		Error_AttributeIndexOutOfRange,
+		Error_ParameterIndexOutOfRange,
+
+		Error_BufferNotBoundToTarget,
+		Error_BufferAlreadyBoundToTarget,
 	};
 
 	enum class EKeyboardKey : uint8_t
@@ -364,6 +388,96 @@ namespace ConsoleGL
 		};
 	};
 
+	enum class EBufferTarget
+	{
+		ArrayBuffer,
+		//ATOMIC_COUNTER_BUFFER,
+		//COPY_READ_BUFFER,
+		//COPY_WRITE_BUFFER,
+		//DISPATCH_INDIRECT_BUFFER,
+		//DRAW_INDIRECT_BUFFER,
+		ElementArrayBuffer,
+		//PIXEL_PACK_BUFFER,
+		//PIXEL_UNPACK_BUFFER,
+		//QUERY_BUFFER,
+		//SHADER_STORAGE_BUFFER,
+		//TEXTURE_BUFFER,
+		//TRANSFORM_FEEDBACK_BUFFER,
+		//UNIFORM_BUFFER,
+
+		MAX
+	};
+
+	enum class EShaderInterpQual
+	{
+		None,
+		Flat,
+		Affine,
+		Perspective
+	};
+
+	enum class EDataType
+	{
+		Custom,
+		Int8,
+		Int16,
+		Int32,
+		Int64,
+		Uint8,
+		Uint16,
+		Uint32,
+		Uint64,
+		Float,
+		Double,
+		Bool,
+		Mat2,
+		Mat3,
+		Mat4,
+		Mat2x3,
+		Mat2x4,
+		Mat3x2,
+		Mat3x4,
+		Mat4x2,
+		Mat4x3,
+		Dmat2,
+		Dmat3,
+		Dmat4,
+		Dmat2x3,
+		Dmat2x4,
+		Dmat3x2,
+		Dmat3x4,
+		Dmat4x2,
+		Dmat4x3,
+		Vec2,
+		Vec3,
+		Vec4,
+		Dvec2,
+		Dvec3,
+		Dvec4,
+		Ivec2,
+		Ivec3,
+		Ivec4,
+		Uvec2,
+		Uvec3,
+		Uvec4
+	};
+
+	enum class ERenderMode
+	{
+		Point,
+		LineStrip,
+		LineLoop,
+		Lines,
+		LineStripAdjacency,
+		LinesAdjacency,
+		TriangleStrip,
+		TriangleFan,
+		Triangles,
+		TriangleStripAdjacency,
+		TrainglesAdjacency,
+		Patches
+	};
+
 	using FragmentFn = Pixel( * )( Coord a_Coord, void* a_State );
 
 	CONSOLEGL_API EError GetLastError();
@@ -489,15 +603,16 @@ namespace ConsoleGL
 	CONSOLEGL_API size_t GetAttachedShaderCount( ShaderProgramHandle a_ShaderProgram );
 	CONSOLEGL_API bool GetAttachedShaders( ShaderProgramHandle a_ShaderProgram, ShaderHandle* a_Shaders );
 	//CONSOLEGL_API void GetProgramIV( ShaderProgramHandle a_ShaderProgramHandle, ShaderInfo a_ShaderInfo, void* a_Value );
-	//CONSOLEGL_API void GetProgramInfoLog( ShaderProgramHandle a_ShaderProgramHandle, size_t a_BufferSize, size_t* a_Length, char* a_InfoLog );
+	CONSOLEGL_API const char* GetShaderProgramInfoLog();
+	CONSOLEGL_API size_t GetShaderProgramInfoLogLength();
 	CONSOLEGL_API bool DetachShader( ShaderProgramHandle a_ShaderProgram, ShaderHandle a_Shader );
 	CONSOLEGL_API bool DetachShaderByType( ShaderProgramHandle a_ShaderProgram, EShaderType a_ShaderType );
 	CONSOLEGL_API bool DeleteShader( ShaderHandle a_Shader );
 	CONSOLEGL_API bool DeleteProgram( ShaderProgramHandle a_ShaderProgram );
 	//CONSOLEGL_API void Init();
-	//CONSOLEGL_API void CreateBuffers( uint32_t a_Count, BufferHandle* a_Handles );
-	//CONSOLEGL_API void BindBuffer( BufferTarget a_BufferBindingTarget, BufferHandle a_Handle );
-	//CONSOLEGL_API void DeleteBuffers( uint32_t a_Count, BufferHandle* a_Handles );
+	CONSOLEGL_API bool CreateBuffers( uint32_t a_Count, BufferHandle* o_Buffers );
+	CONSOLEGL_API bool BindBuffer( EBufferTarget a_BufferTarget, BufferHandle a_Buffer );
+	CONSOLEGL_API bool DeleteBuffers( uint32_t a_Count, const BufferHandle* a_Buffers );
 	//CONSOLEGL_API bool IsBuffer( BufferHandle a_Handle );
 	//CONSOLEGL_API bool ViewPort( size_t a_X, size_t a_Y, size_t a_Width, size_t a_Height );
 	CONSOLEGL_API bool UseProgram( ShaderProgramHandle a_ShaderProgram );
@@ -505,15 +620,15 @@ namespace ConsoleGL
 	//CONSOLEGL_API void ClearColour( float a_R, float a_G, float a_B, float a_A );
 	//CONSOLEGL_API void ClearDepth( float a_ClearDepth );
 	//CONSOLEGL_API void DrawArrays( RenderMode a_Mode, uint32_t a_Begin, uint32_t a_Count );
-	//CONSOLEGL_API void BufferData( BufferTarget a_BufferTarget, size_t a_Size, const void* a_Data, DataUsage a_DataUsage );
+	CONSOLEGL_API bool BufferData( EBufferTarget a_BufferTarget, size_t a_Size, const void* a_Data/*, DataUsage a_DataUsage */);
 	//CONSOLEGL_API void NamedBufferData( BufferHandle a_Handle, size_t a_Size, const void* a_Data, DataUsage a_DataUsage );
-	//CONSOLEGL_API void GenVertexArrays( uint32_t a_Count, ArrayHandle* a_Handles );
-	//CONSOLEGL_API void BindVertexArray( ArrayHandle a_Handle );
-	//CONSOLEGL_API void DeleteVertexArrays( uint32_t a_Count, ArrayHandle* a_Handles );
-	//CONSOLEGL_API void EnableVertexAttribArray( uint32_t a_Position );
-	//CONSOLEGL_API void DisableVertexAttribArray( uint32_t a_Position );
-	//CONSOLEGL_API void VertexAttribPointer( uint32_t a_Index, uint32_t a_Size, DataType a_DataType, bool a_Normalized, size_t a_Stride, void* a_Offset );
-	//CONSOLEGL_API void DrawElements( RenderMode a_Mode, uint32_t a_Count, DataType a_DataType, const void* a_Indices );
+	CONSOLEGL_API bool CreateVertexArrays( uint32_t a_Count, VertexArrayHandle* o_VertexArrays );
+	CONSOLEGL_API bool BindVertexArray( VertexArrayHandle a_VertexArray );
+	CONSOLEGL_API bool DeleteVertexArrays( uint32_t a_Count, const VertexArrayHandle* a_VertexArrays );
+	CONSOLEGL_API bool EnableVertexAttribArray( uint32_t a_Location );
+	CONSOLEGL_API bool DisableVertexAttribArray( uint32_t a_Location );
+	CONSOLEGL_API bool VertexAttribPointer( uint32_t a_Location, uint32_t a_Size, EDataType a_DataType, bool a_Normalize, uint32_t a_Stride, uint32_t a_Offset );
+	CONSOLEGL_API bool DrawElements( ERenderMode a_Mode, uint32_t a_Count, EDataType a_DataType, const void* a_Indices );
 	//CONSOLEGL_API void Enable( RenderSetting a_RenderSetting );
 	//CONSOLEGL_API void Disable( RenderSetting a_RenderSetting );
 	//CONSOLEGL_API void CullFace( CullFaceMode a_CullFace );
@@ -536,40 +651,66 @@ namespace ConsoleGL
 	//CONSOLEGL_API void TextureParameterui( TextureHandle a_Handle, TextureParameter a_TextureParameter, uint32_t a_Value );
 	//CONSOLEGL_API void TextureParameterui( TextureHandle a_Handle, TextureParameter a_TextureParameter, const uint32_t* a_Value );
 	//CONSOLEGL_API void TexImage2D( TextureTarget a_TextureTarget, uint8_t a_MipMapLevel, TextureFormat a_InternalFormat, int32_t a_Width, int32_t a_Height, int32_t a_Border, TextureFormat a_TextureFormat, TextureSetting a_DataLayout, const void* a_Data );
+
+	// Uniforms
 	CONSOLEGL_API int32_t GetUniformLocation( ShaderProgramHandle a_ShaderProgram, const char* a_Name );
-	//CONSOLEGL_API void Uniform1f( int32_t a_Location, float a_V0 );
-	//CONSOLEGL_API void Uniform2f( int32_t a_Location, float a_V0, float a_V1 );
-	//CONSOLEGL_API void Uniform3f( int32_t a_Location, float a_V0, float a_V1, float a_V2 );
-	//CONSOLEGL_API void Uniform4f( int32_t a_Location, float a_V0, float a_V1, float a_V2, float a_V3 );
-	//CONSOLEGL_API void Uniform1i( int32_t a_Location, int32_t a_V0 );
-	//CONSOLEGL_API void Uniform2i( int32_t a_Location, int32_t a_V0, int32_t a_V1 );
-	//CONSOLEGL_API void Uniform3i( int32_t a_Location, int32_t a_V0, int32_t a_V1, int32_t a_V2 );
-	//CONSOLEGL_API void Uniform4i( int32_t a_Location, int32_t a_V0, int32_t a_V1, int32_t a_V2, int32_t a_V3 );
-	//CONSOLEGL_API void Uniform1ui( int32_t a_Location, uint32_t a_V0 );
-	//CONSOLEGL_API void Uniform2ui( int32_t a_Location, uint32_t a_V0, uint32_t a_V1 );
-	//CONSOLEGL_API void Uniform3ui( int32_t a_Location, uint32_t a_V0, uint32_t a_V1, uint32_t a_V2 );
-	//CONSOLEGL_API void Uniform4ui( int32_t a_Location, uint32_t a_V0, uint32_t a_V1, uint32_t a_V2, uint32_t a_V3 );
-	//CONSOLEGL_API void Uniform1fv( int32_t a_Location, uint32_t a_Count, const float* a_Value );
-	//CONSOLEGL_API void Uniform2fv( int32_t a_Location, uint32_t a_Count, const float* a_Value );
-	//CONSOLEGL_API void Uniform3fv( int32_t a_Location, uint32_t a_Count, const float* a_Value );
-	//CONSOLEGL_API void Uniform4fv( int32_t a_Location, uint32_t a_Count, const float* a_Value );
-	//CONSOLEGL_API void Uniform1iv( int32_t a_Location, uint32_t a_Count, const int32_t* a_Value );
-	//CONSOLEGL_API void Uniform2iv( int32_t a_Location, uint32_t a_Count, const int32_t* a_Value );
-	//CONSOLEGL_API void Uniform3iv( int32_t a_Location, uint32_t a_Count, const int32_t* a_Value );
-	//CONSOLEGL_API void Uniform4iv( int32_t a_Location, uint32_t a_Count, const int32_t* a_Value );
-	//CONSOLEGL_API void Uniform1uiv( int32_t a_Location, uint32_t a_Count, const uint32_t* a_Value );
-	//CONSOLEGL_API void Uniform2uiv( int32_t a_Location, uint32_t a_Count, const uint32_t* a_Value );
-	//CONSOLEGL_API void Uniform3uiv( int32_t a_Location, uint32_t a_Count, const uint32_t* a_Value );
-	//CONSOLEGL_API void Uniform4uiv( int32_t a_Location, uint32_t a_Count, const uint32_t* a_Value );
-	//CONSOLEGL_API void UniformMatrix2fv( uint32_t a_Location, uint32_t a_Count, bool a_Transpose, const float* a_Value );
-	//CONSOLEGL_API void UniformMatrix3fv( uint32_t a_Location, uint32_t a_Count, bool a_Transpose, const float* a_Value );
-	//CONSOLEGL_API void UniformMatrix4fv( uint32_t a_Location, uint32_t a_Count, bool a_Transpose, const float* a_Value );
-	//CONSOLEGL_API void UniformMatrix2x3fv( uint32_t a_Location, uint32_t a_Count, bool a_Transpose, const float* a_Value );
-	//CONSOLEGL_API void UniformMatrix3x2fv( uint32_t a_Location, uint32_t a_Count, bool a_Transpose, const float* a_Value );
-	//CONSOLEGL_API void UniformMatrix2x4fv( uint32_t a_Location, uint32_t a_Count, bool a_Transpose, const float* a_Value );
-	//CONSOLEGL_API void UniformMatrix4x2fv( uint32_t a_Location, uint32_t a_Count, bool a_Transpose, const float* a_Value );
-	//CONSOLEGL_API void UniformMatrix3x4fv( uint32_t a_Location, uint32_t a_Count, bool a_Transpose, const float* a_Value );
-	//CONSOLEGL_API void UniformMatrix4x3fv( uint32_t a_Location, uint32_t a_Count, bool a_Transpose, const float* a_Value );
+	CONSOLEGL_API uint32_t GetUniformCount( ShaderProgramHandle a_ShaderProgram );
+	CONSOLEGL_API const char* GetUniformName( ShaderProgramHandle a_ShaderProgram, uint32_t a_Index );
+	CONSOLEGL_API bool GetUniformType( ShaderProgramHandle a_ShaderProgram, uint32_t a_Index, EDataType& o_DataType );
+	CONSOLEGL_API const char* GetUniformTypeName( ShaderProgramHandle a_ShaderProgram, uint32_t a_Index );
+	CONSOLEGL_API bool GetUniformArrayLength( ShaderProgramHandle a_ShaderProgram, uint32_t a_Index, uint32_t& o_ArrayLength );
+	CONSOLEGL_API bool GetUniformSize( ShaderProgramHandle a_ShaderProgram, uint32_t a_Index, uint32_t& o_Size );
+	CONSOLEGL_API void Uniform1f( int32_t a_Location, float a_V0 );
+	CONSOLEGL_API void Uniform2f( int32_t a_Location, float a_V0, float a_V1 );
+	CONSOLEGL_API void Uniform3f( int32_t a_Location, float a_V0, float a_V1, float a_V2 );
+	CONSOLEGL_API void Uniform4f( int32_t a_Location, float a_V0, float a_V1, float a_V2, float a_V3 );
+	CONSOLEGL_API void Uniform1i( int32_t a_Location, int32_t a_V0 );
+	CONSOLEGL_API void Uniform2i( int32_t a_Location, int32_t a_V0, int32_t a_V1 );
+	CONSOLEGL_API void Uniform3i( int32_t a_Location, int32_t a_V0, int32_t a_V1, int32_t a_V2 );
+	CONSOLEGL_API void Uniform4i( int32_t a_Location, int32_t a_V0, int32_t a_V1, int32_t a_V2, int32_t a_V3 );
+	CONSOLEGL_API void Uniform1ui( int32_t a_Location, uint32_t a_V0 );
+	CONSOLEGL_API void Uniform2ui( int32_t a_Location, uint32_t a_V0, uint32_t a_V1 );
+	CONSOLEGL_API void Uniform3ui( int32_t a_Location, uint32_t a_V0, uint32_t a_V1, uint32_t a_V2 );
+	CONSOLEGL_API void Uniform4ui( int32_t a_Location, uint32_t a_V0, uint32_t a_V1, uint32_t a_V2, uint32_t a_V3 );
+	CONSOLEGL_API void Uniform1fv( int32_t a_Location, uint32_t a_Count, const float* a_Value );
+	CONSOLEGL_API void Uniform2fv( int32_t a_Location, uint32_t a_Count, const float* a_Value );
+	CONSOLEGL_API void Uniform3fv( int32_t a_Location, uint32_t a_Count, const float* a_Value );
+	CONSOLEGL_API void Uniform4fv( int32_t a_Location, uint32_t a_Count, const float* a_Value );
+	CONSOLEGL_API void Uniform1iv( int32_t a_Location, uint32_t a_Count, const int32_t* a_Value );
+	CONSOLEGL_API void Uniform2iv( int32_t a_Location, uint32_t a_Count, const int32_t* a_Value );
+	CONSOLEGL_API void Uniform3iv( int32_t a_Location, uint32_t a_Count, const int32_t* a_Value );
+	CONSOLEGL_API void Uniform4iv( int32_t a_Location, uint32_t a_Count, const int32_t* a_Value );
+	CONSOLEGL_API void Uniform1uiv( int32_t a_Location, uint32_t a_Count, const uint32_t* a_Value );
+	CONSOLEGL_API void Uniform2uiv( int32_t a_Location, uint32_t a_Count, const uint32_t* a_Value );
+	CONSOLEGL_API void Uniform3uiv( int32_t a_Location, uint32_t a_Count, const uint32_t* a_Value );
+	CONSOLEGL_API void Uniform4uiv( int32_t a_Location, uint32_t a_Count, const uint32_t* a_Value );
+	CONSOLEGL_API void UniformMatrix2fv( int32_t a_Location, uint32_t a_Count, bool a_Transpose, const float* a_Value );
+	CONSOLEGL_API void UniformMatrix3fv( int32_t a_Location, uint32_t a_Count, bool a_Transpose, const float* a_Value );
+	CONSOLEGL_API void UniformMatrix4fv( int32_t a_Location, uint32_t a_Count, bool a_Transpose, const float* a_Value );
+	CONSOLEGL_API void UniformMatrix2x3fv( int32_t a_Location, uint32_t a_Count, bool a_Transpose, const float* a_Value );
+	CONSOLEGL_API void UniformMatrix3x2fv( int32_t a_Location, uint32_t a_Count, bool a_Transpose, const float* a_Value );
+	CONSOLEGL_API void UniformMatrix2x4fv( int32_t a_Location, uint32_t a_Count, bool a_Transpose, const float* a_Value );
+	CONSOLEGL_API void UniformMatrix4x2fv( int32_t a_Location, uint32_t a_Count, bool a_Transpose, const float* a_Value );
+	CONSOLEGL_API void UniformMatrix3x4fv( int32_t a_Location, uint32_t a_Count, bool a_Transpose, const float* a_Value );
+	CONSOLEGL_API void UniformMatrix4x3fv( int32_t a_Location, uint32_t a_Count, bool a_Transpose, const float* a_Value );
+
+	// Attributes
+	CONSOLEGL_API int32_t GetAttribLocation( ShaderProgramHandle a_ShaderProgram, const char* a_Name );
+	CONSOLEGL_API uint32_t GetAttribCount( ShaderProgramHandle a_ShaderProgram );
+	CONSOLEGL_API const char* GetAttribName( ShaderProgramHandle a_ShaderProgram, uint32_t a_Index );
+	CONSOLEGL_API bool GetAttribType( ShaderProgramHandle a_ShaderProgram, uint32_t a_Index, EDataType& o_DataType );
+	CONSOLEGL_API const char* GetAttribTypeName( ShaderProgramHandle a_ShaderProgram, uint32_t a_Index );
+	CONSOLEGL_API bool GetAttribArrayLength( ShaderProgramHandle a_ShaderProgram, uint32_t a_Index, uint32_t& o_ArrayLength );
+	CONSOLEGL_API bool GetAttribSize( ShaderProgramHandle a_ShaderProgram, uint32_t a_Index, uint32_t& o_Size );
+
+	// Parameters
+	CONSOLEGL_API uint32_t GetParamCount( ShaderProgramHandle a_ShaderProgram );
+	CONSOLEGL_API bool GetParamInterpType( ShaderProgramHandle a_ShaderProgram, uint32_t a_Index, EShaderInterpQual& o_InterpQual );
+	CONSOLEGL_API const char* GetParamName( ShaderProgramHandle a_ShaderProgram, uint32_t a_Index );
+	CONSOLEGL_API bool GetParamType( ShaderProgramHandle a_ShaderProgram, uint32_t a_Index, EDataType& o_DataType );
+	CONSOLEGL_API const char* GetParamTypeName( ShaderProgramHandle a_ShaderProgram, uint32_t a_Index );
+	CONSOLEGL_API bool GetParamArrayLength( ShaderProgramHandle a_ShaderProgram, uint32_t a_Index, uint32_t& o_ArrayLength );
+	CONSOLEGL_API bool GetParamSize( ShaderProgramHandle a_ShaderProgram, uint32_t a_Index, uint32_t& o_Size );
 
 #pragma endregion
 

@@ -85,6 +85,7 @@ void StripComments( std::string& a_String )
 
 struct ShaderVariableInfo
 {
+	std::string Declaration;
     std::string InterpQualifier;
 	std::string StorageQual;
     int32_t Location = -1;
@@ -105,6 +106,7 @@ std::vector< ShaderVariableInfo > GetGlobalVariables( const std::string& a_Strin
         ShaderVariableInfo VariableInfo;
         std::smatch Match = *Iter;
 
+		VariableInfo.Declaration = std::regex_replace( Match[ 0u ].str(), std::regex( "\n" ), "" );
         VariableInfo.InterpQualifier = Match[ 1u ];
         VariableInfo.StorageQual = Match[ 2u ];
         VariableInfo.Location = Match[ 4u ].matched ? std::stoi( Match[ 4u ] ) : -1;
@@ -123,6 +125,7 @@ std::string CreateInfoFunction( const std::vector< ShaderVariableInfo >& a_Input
 	Result += R"(
 struct ShaderVariableInfo
 {
+	const char* Declaration = nullptr;
 	const char* InterpQual = nullptr;
 	const char* StorageQual = nullptr;
 	const char* Type = nullptr;
@@ -147,6 +150,7 @@ struct ShaderInfo
 	for ( size_t i = 0u; i < a_Input.size(); ++i )
 	{
 		std::string Index = std::to_string( i );
+		Result += std::vformat( "\tVariables[{0}].Declaration = \"{1}\";\n", std::make_format_args( Index, a_Input[ i ].Declaration ) );
 		Result += std::vformat( "\tVariables[{0}].InterpQual = \"{1}\";\n", std::make_format_args( Index, a_Input[ i ].InterpQualifier ) );
 		Result += std::vformat( "\tVariables[{0}].StorageQual = \"{1}\";\n", std::make_format_args( Index, a_Input[ i ].StorageQual ) );
 		Result += std::vformat( "\tVariables[{0}].Type = \"{1}\";\n", std::make_format_args( Index, a_Input[ i ].Type ) );
