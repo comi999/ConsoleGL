@@ -12,6 +12,7 @@
 #include <Event.hpp>
 #include <FileMap.hpp>
 #include <PixelBuffer.hpp>
+#include <Utilities.hpp>
 
 #include <memory_module/MemoryModule.hpp>
 #include <detail/func_matrix.hpp>
@@ -32,6 +33,30 @@
 #endif
 
 #define SHADER_STAGE_COUNT 2u
+
+#define UNIFORM_CHECK() \
+	if ( !State.ActiveContext ) \
+	{ \
+		Error::SetLastError( Error_NoActiveContext ); \
+		return; \
+	} \
+ \
+	if ( !State.ActiveContext->ActiveShaderProgram ) \
+	{ \
+		Error::SetLastError( Error_NoActiveShaderProgram ); \
+		return; \
+	} \
+ \
+	const auto& Uniform = State.ActiveContext->ActiveShaderProgram->Uniforms[ a_Location ]; \
+ \
+	if ( !Uniform.has_value() ) \
+	{ \
+		Error::SetLastError( Error_InvalidUniformLocation ); \
+		return; \
+	} \
+
+#define SET_UNIFORM_VAL( Type, Index, Val ) \
+	static_cast< Type* >( Uniform.value().Data )[ Index ] = Val
 
 // To do
 // Move error into this cpp.
@@ -400,11 +425,31 @@ namespace ConsoleGL
 		VertexArray				DefaultVertexArray;
 		VertexArrayHandle		ActiveVertexArray;
 	};
-}
 
-bool ConvertShaderInbuilt( const ConsoleGL::ShaderVariable& a_ShaderVar, ConsoleGL::EShaderInbuiltVar& o_ShaderInbuilt )
-{
-	switch ( ( ConsoleGL::EShaderInbuiltVar )0 )
+	void DestructorWindow( ConsoleGL::Window* a_Window ) {}
+	void DestructorContext( ConsoleGL::Context* a_Context ) {}
+	void DestructorShader( ConsoleGL::Shader* a_Shader ) {}
+	void DestructorShaderProgram( ConsoleGL::ShaderProgram* a_ShaderProgram ) {}
+
+	// Define repositories for each object.
+	DEFINE_REPOSITORY( Window, WINDOW_MAX_COUNT );
+	DEFINE_REPOSITORY( Context, CONTEXT_MAX_COUNT );
+	DEFINE_REPOSITORY( Shader, SHADER_MAX_COUNT );
+	DEFINE_REPOSITORY( ShaderProgram, SHADER_PROGRAM_MAX_COUNT );
+	
+	struct
+	{
+		WindowRepository				Windows;
+		ContextRepository				Contexts;
+		ShaderRepository				Shaders;
+		ShaderProgramRepository			ShaderPrograms;
+		ConsoleGL::WindowHandle			ActiveWindow;
+		ConsoleGL::ContextHandle		ActiveContext;
+	} static State;
+
+	bool ConvertShaderInbuilt( const ConsoleGL::ShaderVariable& a_ShaderVar, ConsoleGL::EShaderInbuiltVar& o_ShaderInbuilt )
+	{
+		switch ( ( ConsoleGL::EShaderInbuiltVar )0 )
 	{
 	case ConsoleGL::EShaderInbuiltVar::out_vec4_VertPos:
 	{
@@ -480,41 +525,41 @@ bool ConvertShaderInbuilt( const ConsoleGL::ShaderVariable& a_ShaderVar, Console
 	}
 	default: break;
 	}
-
-	o_ShaderInbuilt = ConsoleGL::EShaderInbuiltVar::None;
-	return true;
-}
-
-bool ConvertShaderVar( const ConsoleGL::ShaderVariableInfo& a_ShaderVarInfo, ConsoleGL::ShaderVariable& o_ShaderVar )
-{
-	const std::string InterpQual = a_ShaderVarInfo.InterpQual;
-
-	if ( InterpQual == "" ) o_ShaderVar.InterpQual = ConsoleGL::EShaderInterpQual::None;
-	else if ( InterpQual == "affn" ) o_ShaderVar.InterpQual = ConsoleGL::EShaderInterpQual::Affine;
-	else if ( InterpQual == "flat" ) o_ShaderVar.InterpQual = ConsoleGL::EShaderInterpQual::Flat;
-	else if ( InterpQual == "prsp" ) o_ShaderVar.InterpQual = ConsoleGL::EShaderInterpQual::Perspective;
-	else return false;
-
-	const std::string StorageQual = a_ShaderVarInfo.StorageQual;
-
-	if ( StorageQual == "" ) return false;
-	else if ( StorageQual == "out" ) o_ShaderVar.StorageQual = ConsoleGL::EShaderStorageQual::Out;
-	else if ( StorageQual == "in" ) o_ShaderVar.StorageQual = ConsoleGL::EShaderStorageQual::In;
-	else if ( StorageQual == "attrib" ) o_ShaderVar.StorageQual = ConsoleGL::EShaderStorageQual::Attribute;
-	else if ( StorageQual == "uniform" ) o_ShaderVar.StorageQual = ConsoleGL::EShaderStorageQual::Uniform;
-	else return false;
-
-	if ( a_ShaderVarInfo.Location == -1 )
+	
+		o_ShaderInbuilt = ConsoleGL::EShaderInbuiltVar::None;
+		return true;
+	}
+	
+	bool ConvertShaderVar( const ConsoleGL::ShaderVariableInfo& a_ShaderVarInfo, ConsoleGL::ShaderVariable& o_ShaderVar )
+	{
+		const std::string InterpQual = a_ShaderVarInfo.InterpQual;
+	
+		if ( InterpQual == "" ) o_ShaderVar.InterpQual = ConsoleGL::EShaderInterpQual::None;
+		else if ( InterpQual == "affn" ) o_ShaderVar.InterpQual = ConsoleGL::EShaderInterpQual::Affine;
+		else if ( InterpQual == "flat" ) o_ShaderVar.InterpQual = ConsoleGL::EShaderInterpQual::Flat;
+		else if ( InterpQual == "prsp" ) o_ShaderVar.InterpQual = ConsoleGL::EShaderInterpQual::Perspective;
+		else return false;
+	
+		const std::string StorageQual = a_ShaderVarInfo.StorageQual;
+	
+		if ( StorageQual == "" ) return false;
+		else if ( StorageQual == "out" ) o_ShaderVar.StorageQual = ConsoleGL::EShaderStorageQual::Out;
+		else if ( StorageQual == "in" ) o_ShaderVar.StorageQual = ConsoleGL::EShaderStorageQual::In;
+		else if ( StorageQual == "attrib" ) o_ShaderVar.StorageQual = ConsoleGL::EShaderStorageQual::Attribute;
+		else if ( StorageQual == "uniform" ) o_ShaderVar.StorageQual = ConsoleGL::EShaderStorageQual::Uniform;
+		else return false;
+	
+		if ( a_ShaderVarInfo.Location == -1 )
 	{
 		o_ShaderVar.Location = -1;
 	}
-	else
+		else
 	{
 		o_ShaderVar.Location = ( uint32_t )a_ShaderVarInfo.Location;
 	}
-
-	// Validate that if there is a location, then it is within range.
-	switch ( o_ShaderVar.StorageQual )
+	
+		// Validate that if there is a location, then it is within range.
+		switch ( o_ShaderVar.StorageQual )
 	{
 	case ConsoleGL::EShaderStorageQual::In:
 	case ConsoleGL::EShaderStorageQual::Out:
@@ -537,100 +582,100 @@ bool ConvertShaderVar( const ConsoleGL::ShaderVariableInfo& a_ShaderVarInfo, Con
 		break;
 	default: break;
 	}
-
-	const std::string DataType = a_ShaderVarInfo.Type;
-
-	if ( DataType == "" ) return false;
-	else if ( DataType == "int8"    ) o_ShaderVar.DataType = ConsoleGL::EDataType::Int8;
-	else if ( DataType == "int16"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Int16;
-	else if ( DataType == "int32"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Int32;
-	else if ( DataType == "int64"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Int64;
-	else if ( DataType == "uint8"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Uint8;
-	else if ( DataType == "uint16"  ) o_ShaderVar.DataType = ConsoleGL::EDataType::Uint16;
-	else if ( DataType == "uint32"  ) o_ShaderVar.DataType = ConsoleGL::EDataType::Uint32;
-	else if ( DataType == "uint64"  ) o_ShaderVar.DataType = ConsoleGL::EDataType::Uint64;
-	else if ( DataType == "float"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Float;
-	else if ( DataType == "double"  ) o_ShaderVar.DataType = ConsoleGL::EDataType::Double;
-	else if ( DataType == "bool"    ) o_ShaderVar.DataType = ConsoleGL::EDataType::Bool;
-	else if ( DataType == "mat2"    ) o_ShaderVar.DataType = ConsoleGL::EDataType::Mat2;
-	else if ( DataType == "mat3"    ) o_ShaderVar.DataType = ConsoleGL::EDataType::Mat3;
-	else if ( DataType == "mat4"    ) o_ShaderVar.DataType = ConsoleGL::EDataType::Mat4;
-	else if ( DataType == "mat2x3"  ) o_ShaderVar.DataType = ConsoleGL::EDataType::Mat2x3;
-	else if ( DataType == "mat2x4"  ) o_ShaderVar.DataType = ConsoleGL::EDataType::Mat2x4;
-	else if ( DataType == "mat3x2"  ) o_ShaderVar.DataType = ConsoleGL::EDataType::Mat3x2;
-	else if ( DataType == "mat3x4"  ) o_ShaderVar.DataType = ConsoleGL::EDataType::Mat3x4;
-	else if ( DataType == "mat4x2"  ) o_ShaderVar.DataType = ConsoleGL::EDataType::Mat4x2;
-	else if ( DataType == "mat4x3"  ) o_ShaderVar.DataType = ConsoleGL::EDataType::Mat4x3;
-	else if ( DataType == "dmat2"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Dmat2;
-	else if ( DataType == "dmat3"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Dmat3;
-	else if ( DataType == "dmat4"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Dmat4;
-	else if ( DataType == "dmat2x3" ) o_ShaderVar.DataType = ConsoleGL::EDataType::Dmat2x3;
-	else if ( DataType == "dmat2x4" ) o_ShaderVar.DataType = ConsoleGL::EDataType::Dmat2x4;
-	else if ( DataType == "dmat3x2" ) o_ShaderVar.DataType = ConsoleGL::EDataType::Dmat3x2;
-	else if ( DataType == "dmat3x4" ) o_ShaderVar.DataType = ConsoleGL::EDataType::Dmat3x4;
-	else if ( DataType == "dmat4x2" ) o_ShaderVar.DataType = ConsoleGL::EDataType::Dmat4x2;
-	else if ( DataType == "dmat4x3" ) o_ShaderVar.DataType = ConsoleGL::EDataType::Dmat4x3;
-	else if ( DataType == "vec2"    ) o_ShaderVar.DataType = ConsoleGL::EDataType::Vec2;
-	else if ( DataType == "vec3"    ) o_ShaderVar.DataType = ConsoleGL::EDataType::Vec3;
-	else if ( DataType == "vec4"    ) o_ShaderVar.DataType = ConsoleGL::EDataType::Vec4;
-	else if ( DataType == "dvec2"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Dvec2;
-	else if ( DataType == "dvec3"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Dvec3;
-	else if ( DataType == "dvec4"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Dvec4;
-	else if ( DataType == "ivec2"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Ivec2;
-	else if ( DataType == "ivec3"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Ivec3;
-	else if ( DataType == "ivec4"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Ivec4;
-	else if ( DataType == "uvec2"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Uvec2;
-	else if ( DataType == "uvec3"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Uvec3;
-	else if ( DataType == "uvec4"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Uvec4;
-	else o_ShaderVar.DataType = ConsoleGL::EDataType::Custom;
-
-	o_ShaderVar.DataTypeName = DataType;
-
-	o_ShaderVar.Name = a_ShaderVarInfo.Name;
-
-	if ( o_ShaderVar.Name == "" )
+	
+		const std::string DataType = a_ShaderVarInfo.Type;
+	
+		if ( DataType == "" ) return false;
+		else if ( DataType == "int8"    ) o_ShaderVar.DataType = ConsoleGL::EDataType::Int8;
+		else if ( DataType == "int16"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Int16;
+		else if ( DataType == "int32"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Int32;
+		else if ( DataType == "int64"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Int64;
+		else if ( DataType == "uint8"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Uint8;
+		else if ( DataType == "uint16"  ) o_ShaderVar.DataType = ConsoleGL::EDataType::Uint16;
+		else if ( DataType == "uint32"  ) o_ShaderVar.DataType = ConsoleGL::EDataType::Uint32;
+		else if ( DataType == "uint64"  ) o_ShaderVar.DataType = ConsoleGL::EDataType::Uint64;
+		else if ( DataType == "float"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Float;
+		else if ( DataType == "double"  ) o_ShaderVar.DataType = ConsoleGL::EDataType::Double;
+		else if ( DataType == "bool"    ) o_ShaderVar.DataType = ConsoleGL::EDataType::Bool;
+		else if ( DataType == "mat2"    ) o_ShaderVar.DataType = ConsoleGL::EDataType::Mat2;
+		else if ( DataType == "mat3"    ) o_ShaderVar.DataType = ConsoleGL::EDataType::Mat3;
+		else if ( DataType == "mat4"    ) o_ShaderVar.DataType = ConsoleGL::EDataType::Mat4;
+		else if ( DataType == "mat2x3"  ) o_ShaderVar.DataType = ConsoleGL::EDataType::Mat2x3;
+		else if ( DataType == "mat2x4"  ) o_ShaderVar.DataType = ConsoleGL::EDataType::Mat2x4;
+		else if ( DataType == "mat3x2"  ) o_ShaderVar.DataType = ConsoleGL::EDataType::Mat3x2;
+		else if ( DataType == "mat3x4"  ) o_ShaderVar.DataType = ConsoleGL::EDataType::Mat3x4;
+		else if ( DataType == "mat4x2"  ) o_ShaderVar.DataType = ConsoleGL::EDataType::Mat4x2;
+		else if ( DataType == "mat4x3"  ) o_ShaderVar.DataType = ConsoleGL::EDataType::Mat4x3;
+		else if ( DataType == "dmat2"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Dmat2;
+		else if ( DataType == "dmat3"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Dmat3;
+		else if ( DataType == "dmat4"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Dmat4;
+		else if ( DataType == "dmat2x3" ) o_ShaderVar.DataType = ConsoleGL::EDataType::Dmat2x3;
+		else if ( DataType == "dmat2x4" ) o_ShaderVar.DataType = ConsoleGL::EDataType::Dmat2x4;
+		else if ( DataType == "dmat3x2" ) o_ShaderVar.DataType = ConsoleGL::EDataType::Dmat3x2;
+		else if ( DataType == "dmat3x4" ) o_ShaderVar.DataType = ConsoleGL::EDataType::Dmat3x4;
+		else if ( DataType == "dmat4x2" ) o_ShaderVar.DataType = ConsoleGL::EDataType::Dmat4x2;
+		else if ( DataType == "dmat4x3" ) o_ShaderVar.DataType = ConsoleGL::EDataType::Dmat4x3;
+		else if ( DataType == "vec2"    ) o_ShaderVar.DataType = ConsoleGL::EDataType::Vec2;
+		else if ( DataType == "vec3"    ) o_ShaderVar.DataType = ConsoleGL::EDataType::Vec3;
+		else if ( DataType == "vec4"    ) o_ShaderVar.DataType = ConsoleGL::EDataType::Vec4;
+		else if ( DataType == "dvec2"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Dvec2;
+		else if ( DataType == "dvec3"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Dvec3;
+		else if ( DataType == "dvec4"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Dvec4;
+		else if ( DataType == "ivec2"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Ivec2;
+		else if ( DataType == "ivec3"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Ivec3;
+		else if ( DataType == "ivec4"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Ivec4;
+		else if ( DataType == "uvec2"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Uvec2;
+		else if ( DataType == "uvec3"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Uvec3;
+		else if ( DataType == "uvec4"   ) o_ShaderVar.DataType = ConsoleGL::EDataType::Uvec4;
+		else o_ShaderVar.DataType = ConsoleGL::EDataType::Custom;
+	
+		o_ShaderVar.DataTypeName = DataType;
+	
+		o_ShaderVar.Name = a_ShaderVarInfo.Name;
+	
+		if ( o_ShaderVar.Name == "" )
 	{
 		return false;
 	}
-
-	o_ShaderVar.Data = const_cast< void* >( a_ShaderVarInfo.Data );
-
-	if ( o_ShaderVar.Data == nullptr )
+	
+		o_ShaderVar.Data = const_cast< void* >( a_ShaderVarInfo.Data );
+	
+		if ( o_ShaderVar.Data == nullptr )
 	{
 		return false;
 	}
-
-	o_ShaderVar.Size = a_ShaderVarInfo.Size;
-
-	if ( o_ShaderVar.Size == 0u )
+	
+		o_ShaderVar.Size = a_ShaderVarInfo.Size;
+	
+		if ( o_ShaderVar.Size == 0u )
 	{
 		return false;
 	}
-
-	o_ShaderVar.Length = a_ShaderVarInfo.Length;
-
-	if ( o_ShaderVar.Length == 0u )
+	
+		o_ShaderVar.Length = a_ShaderVarInfo.Length;
+	
+		if ( o_ShaderVar.Length == 0u )
 	{
 		return false;
 	}
-
-	if ( !ConvertShaderInbuilt( o_ShaderVar, o_ShaderVar.InbuiltVar ) )
+	
+		if ( !ConvertShaderInbuilt( o_ShaderVar, o_ShaderVar.InbuiltVar ) )
 	{
 		return false;
 	}
-
-	// If there is no interpolation qualifier and it's an out variable, then we use the default, perspective.
-	if ( o_ShaderVar.InterpQual == ConsoleGL::EShaderInterpQual::None && o_ShaderVar.StorageQual == ConsoleGL::EShaderStorageQual::Out && o_ShaderVar.InbuiltVar == ConsoleGL::EShaderInbuiltVar::None )
+	
+		// If there is no interpolation qualifier and it's an out variable, then we use the default, perspective.
+		if ( o_ShaderVar.InterpQual == ConsoleGL::EShaderInterpQual::None && o_ShaderVar.StorageQual == ConsoleGL::EShaderStorageQual::Out && o_ShaderVar.InbuiltVar == ConsoleGL::EShaderInbuiltVar::None )
 	{
 		o_ShaderVar.InterpQual = ConsoleGL::EShaderInterpQual::Perspective;
 	}
-
-	return true;
-}
-
-bool IsValidShaderInbuilt( const ConsoleGL::EShaderType a_ShaderType, const ConsoleGL::EShaderInbuiltVar a_InbuiltVar )
-{
-	switch ( a_ShaderType )
+	
+		return true;
+	}
+	
+	bool IsValidShaderInbuilt( const ConsoleGL::EShaderType a_ShaderType, const ConsoleGL::EShaderInbuiltVar a_InbuiltVar )
+	{
+		switch ( a_ShaderType )
 	{
 	case ConsoleGL::EShaderType::Vertex:
 	{
@@ -653,13 +698,13 @@ bool IsValidShaderInbuilt( const ConsoleGL::EShaderType a_ShaderType, const Cons
 		}
 	}
 	}
-
-	return false;
-}
-
-bool GetVarTypeAsUnderlying( const ConsoleGL::EDataType a_VarType, ConsoleGL::EDataType& o_UnderlyingVarType, uint32_t& o_ArraySize )
-{
-	switch ( a_VarType )
+	
+		return false;
+	}
+	
+	bool GetVarTypeAsUnderlying( const ConsoleGL::EDataType a_VarType, ConsoleGL::EDataType& o_UnderlyingVarType, uint32_t& o_ArraySize )
+	{
+		switch ( a_VarType )
 	{
 	case ConsoleGL::EDataType::Custom:
 		return false;
@@ -829,13 +874,13 @@ bool GetVarTypeAsUnderlying( const ConsoleGL::EDataType a_VarType, ConsoleGL::ED
 		break;
 	default: break;
 	};
-
-	return true;
-}
-
-const char* GetShaderTypeName( const ConsoleGL::EShaderType a_ShaderType )
-{
-	switch ( a_ShaderType )
+	
+		return true;
+	}
+	
+	const char* GetShaderTypeName( const ConsoleGL::EShaderType a_ShaderType )
+	{
+		switch ( a_ShaderType )
 	{
 	case ConsoleGL::EShaderType::Vertex:
 		return "Vertex";
@@ -843,13 +888,13 @@ const char* GetShaderTypeName( const ConsoleGL::EShaderType a_ShaderType )
 		return "Fragment";
 	default: break;
 	}
-
-	return "";
-}
-
-const char* GetInterpQualName( const ConsoleGL::EShaderInterpQual a_InterpQual )
-{
-	switch ( a_InterpQual )
+	
+		return "";
+	}
+	
+	const char* GetInterpQualName( const ConsoleGL::EShaderInterpQual a_InterpQual )
+	{
+		switch ( a_InterpQual )
 	{
 	case ConsoleGL::EShaderInterpQual::Flat:
 		return "flat";
@@ -859,13 +904,13 @@ const char* GetInterpQualName( const ConsoleGL::EShaderInterpQual a_InterpQual )
 		return "prsp";
 	default: break;
 	}
-
-	return "";
-}
-
-const char* GetStorageQualName( const ConsoleGL::EShaderStorageQual a_StorageQual )
-{
-	switch ( a_StorageQual )
+	
+		return "";
+	}
+	
+	const char* GetStorageQualName( const ConsoleGL::EShaderStorageQual a_StorageQual )
+	{
+		switch ( a_StorageQual )
 	{
 	case ConsoleGL::EShaderStorageQual::Uniform:
 		return "uniform";
@@ -877,36 +922,543 @@ const char* GetStorageQualName( const ConsoleGL::EShaderStorageQual a_StorageQua
 		return "out";
 	default: break;
 	}
+	
+		return "";
+	}
+	
+	size_t GetDataTypeSize( const ConsoleGL::EDataType a_DataType )
+	{
+		uint32_t ArraySize;
+		ConsoleGL::EDataType UnderlyingType;
+	
+		if ( !GetVarTypeAsUnderlying( a_DataType, UnderlyingType, ArraySize ) )
+	{
+		return 0u;
+	}
+	
+		size_t Size;
+	
+		switch ( UnderlyingType )
+	{
+	case ConsoleGL::EDataType::Int8:
+		Size = 1u;
+		break;
+	case ConsoleGL::EDataType::Int16:
+		Size = 2u;
+		break;
+	case ConsoleGL::EDataType::Int32:
+		Size = 4u;
+		break;
+	case ConsoleGL::EDataType::Int64:
+		Size = 8u;
+		break;
+	case ConsoleGL::EDataType::Uint8:
+		Size = 1u;
+		break;
+	case ConsoleGL::EDataType::Uint16:
+		Size = 2u;
+		break;
+	case ConsoleGL::EDataType::Uint32:
+		Size = 4u;
+		break;
+	case ConsoleGL::EDataType::Uint64:
+		Size = 8u;
+		break;
+	case ConsoleGL::EDataType::Float:
+		Size = 4u;
+		break;
+	case ConsoleGL::EDataType::Double:
+		Size = 8u;
+		break;
+	case ConsoleGL::EDataType::Bool:
+		Size = 1u;
+		break;
+	default:
+		Size = 0u;
+		break;
+	}
+	
+		return Size * ArraySize;
+	}
+	
+	uint32_t GetIndicesPerPrimitiveType( const ConsoleGL::EPrimitiveType a_PrimitiveType )
+	{
+		switch ( a_PrimitiveType )
+		{
+		case ConsoleGL::EPrimitiveType::Points:
+			return 1u;
+		case ConsoleGL::EPrimitiveType::Lines:
+			return 2u;
+		case ConsoleGL::EPrimitiveType::Triangles:
+			return 3u;
+		default: return 0u;
+		}
+	}
+	
+	using IndexerFn = uint64_t(*)( const void*& );
 
-	return "";
+	IndexerFn GetIndexerFn( const EDataType a_DataType )
+	{
+	#define FN_RETURN( Type ) \
+		return +[]( const void*& a_Data ) { uint64_t Index = *static_cast< const Type* >( a_Data ); a_Data = static_cast< const Type* >( a_Data ) + 1; return Index; };
+	
+		switch ( a_DataType )
+		{
+		case ConsoleGL::EDataType::Int8:
+			FN_RETURN( int8_t );
+		case ConsoleGL::EDataType::Int16:
+			FN_RETURN( int16_t );
+		case ConsoleGL::EDataType::Int32:
+			FN_RETURN( int32_t );
+		case ConsoleGL::EDataType::Int64:
+			FN_RETURN( int64_t );
+		case ConsoleGL::EDataType::Uint8:
+			FN_RETURN( uint8_t );
+		case ConsoleGL::EDataType::Uint16:
+			FN_RETURN( uint16_t );
+		case ConsoleGL::EDataType::Uint32:
+			FN_RETURN( uint32_t );
+		case ConsoleGL::EDataType::Uint64:
+			FN_RETURN( uint64_t );
+		default: return nullptr;
+		}
+		
+	#undef FN_RETURN
+	}
+
+	using AttribSetterFn = void(*)( const void*&, void*, uint32_t );
+	TODO( "Needs to somehow support normalize." );
+	AttribSetterFn GetAttribSetterFn( const EDataType a_DataType )
+	{
+	#define FN_RETURN( Type ) \
+		return +[]( const void*& a_Input, void* a_Output, const uint32_t a_Stride ) \
+		{ \
+			*static_cast< Type* >( a_Output ) = *static_cast< const Type* >( a_Input ); \
+			a_Input = static_cast< const uint8_t* >( a_Input ) + a_Stride; \
+		};
+	
+		switch ( a_DataType )
+		{
+		case ConsoleGL::EDataType::Custom:
+			return nullptr;
+		case ConsoleGL::EDataType::Int8:
+			FN_RETURN( int8_t );
+		case ConsoleGL::EDataType::Int16:
+			FN_RETURN( int16_t );
+		case ConsoleGL::EDataType::Int32:
+			FN_RETURN( int32_t );
+		case ConsoleGL::EDataType::Int64:
+			FN_RETURN( int64_t );
+		case ConsoleGL::EDataType::Uint8:
+			FN_RETURN( uint8_t );
+		case ConsoleGL::EDataType::Uint16:
+			FN_RETURN( uint16_t );
+		case ConsoleGL::EDataType::Uint32:
+			FN_RETURN( uint32_t );
+		case ConsoleGL::EDataType::Uint64:
+			FN_RETURN( uint64_t );
+		case ConsoleGL::EDataType::Float:
+			FN_RETURN( float );
+		case ConsoleGL::EDataType::Double:
+			FN_RETURN( double );
+		case ConsoleGL::EDataType::Bool:
+			FN_RETURN( bool );
+		case ConsoleGL::EDataType::Mat2:
+			FN_RETURN( glm::mat2 );
+		case ConsoleGL::EDataType::Mat3:
+			FN_RETURN( glm::mat3 );
+		case ConsoleGL::EDataType::Mat4:
+			FN_RETURN( glm::mat4 );
+		case ConsoleGL::EDataType::Mat2x3:
+			FN_RETURN( glm::mat2x3 );
+		case ConsoleGL::EDataType::Mat2x4:
+			FN_RETURN( glm::mat2x4 );
+		case ConsoleGL::EDataType::Mat3x2:
+			FN_RETURN( glm::mat3x2 );
+		case ConsoleGL::EDataType::Mat3x4:
+			FN_RETURN( glm::mat3x4 );
+		case ConsoleGL::EDataType::Mat4x2:
+			FN_RETURN( glm::mat4x2 );
+		case ConsoleGL::EDataType::Mat4x3:
+			FN_RETURN( glm::mat4x3 );
+		case ConsoleGL::EDataType::Dmat2:
+			FN_RETURN( glm::dmat2 );
+		case ConsoleGL::EDataType::Dmat3:
+			FN_RETURN( glm::dmat3 );
+		case ConsoleGL::EDataType::Dmat4:
+			FN_RETURN( glm::dmat4 );
+		case ConsoleGL::EDataType::Dmat2x3:
+			FN_RETURN( glm::dmat2x3 );
+		case ConsoleGL::EDataType::Dmat2x4:
+			FN_RETURN( glm::dmat2x4 );
+		case ConsoleGL::EDataType::Dmat3x2:
+			FN_RETURN( glm::dmat3x2 );
+		case ConsoleGL::EDataType::Dmat3x4:
+			FN_RETURN( glm::dmat3x4 );
+		case ConsoleGL::EDataType::Dmat4x2:
+			FN_RETURN( glm::dmat4x2 );
+		case ConsoleGL::EDataType::Dmat4x3:
+			FN_RETURN( glm::dmat4x3 );
+		case ConsoleGL::EDataType::Vec2:
+			FN_RETURN( glm::vec2 );
+		case ConsoleGL::EDataType::Vec3:
+			FN_RETURN( glm::vec3 );
+		case ConsoleGL::EDataType::Vec4:
+			FN_RETURN( glm::vec4 );
+		case ConsoleGL::EDataType::Dvec2:
+			FN_RETURN( glm::dvec2 );
+		case ConsoleGL::EDataType::Dvec3:
+			FN_RETURN( glm::dvec3 );
+		case ConsoleGL::EDataType::Dvec4:
+			FN_RETURN( glm::dvec4 );
+		case ConsoleGL::EDataType::Ivec2:
+			FN_RETURN( glm::ivec2 );
+		case ConsoleGL::EDataType::Ivec3:
+			FN_RETURN( glm::ivec3 );
+		case ConsoleGL::EDataType::Ivec4:
+			FN_RETURN( glm::ivec4 );
+		case ConsoleGL::EDataType::Uvec2:
+			FN_RETURN( glm::uvec2 );
+		case ConsoleGL::EDataType::Uvec3:
+			FN_RETURN( glm::uvec3 );
+		case ConsoleGL::EDataType::Uvec4:
+			FN_RETURN( glm::uvec4 );
+		default: return nullptr;
+		}
+
+	#undef FN_RETURN
+	}
+
+	struct AttribSetter
+	{
+		const void* Input;
+		void* Output;
+		AttribSetterFn SetterFn;
+		uint32_t Stride;
+	};
+
+	void IncrementAttribSetter( AttribSetter& a_AttribSetter )
+	{
+		a_AttribSetter.SetterFn( a_AttribSetter.Input, a_AttribSetter.Output, a_AttribSetter.Stride );
+	}
+
+	TODO( "ParamSetter/Getter can be combined into one structure" );
+	struct ParamGetter
+	{
+		const void* Input;
+		void* Output;
+		uint32_t Stride;
+		uint32_t Size;
+	};
+
+	void IncrementParamGetter( ParamGetter& a_ParamGetter )
+	{
+		( void )memcpy( a_ParamGetter.Output, a_ParamGetter.Input, a_ParamGetter.Size );
+		a_ParamGetter.Output = static_cast< uint8_t* >( a_ParamGetter.Output ) + a_ParamGetter.Stride;
+	}
+
+	struct ParamSetter
+	{
+		void* Output;
+		uint32_t Offset;
+		uint32_t Size;
+	};
+
+	void RunParamSetter( const ParamSetter& a_ParamSetter, const float* a_Params )
+	{
+		( void )memcpy( a_ParamSetter.Output, ( const uint8_t* )a_Params + a_ParamSetter.Offset, a_ParamSetter.Size );
+	}
+
+	struct PipelineState
+	{
+		VertexArrayHandle VertexArray;
+		ShaderProgramHandle ShaderProgram;
+
+		EPrimitiveType PrimitiveType;
+		uint32_t VertexCount;
+		uint32_t IndexCount;
+		const void* Indices;
+		EDataType IndexType;
+		IndexerFn Indexer;
+		ShaderProcRunFn Run[ SHADER_STAGE_COUNT ];
+		uint32_t AttribCount;
+		AttribSetter AttribSetters[ MAX_SHADER_ATTRIBUTES ];
+		uint32_t ParamCount;
+		ParamGetter ParamGetters[ MAX_SHADER_PARAMETERS ];
+		ParamSetter ParamSetters[ MAX_SHADER_PARAMETERS ];
+		std::vector< float > ParamData;
+		uint32_t ParameterStride;
+		uint32_t FlatStride;
+		uint32_t AffineStride;
+		uint32_t PerspectiveStride;
+		const glm::vec4* VertPos;
+		const glm::vec4* FragColour;
+		float ViewportW, ViewportH;
+		EnumBitfield< ERenderSetting > Settings;
+		std::vector< glm::vec4 > ProcessedVerts;
+	};
+
+	bool InitPipelineState( PipelineState& o_PipelineState, const EPrimitiveType a_PrimitiveType, const uint32_t a_VertexCount, const uint32_t a_IndexCount, const void* a_Indices, const EDataType a_IndexType )
+	{
+		o_PipelineState.PrimitiveType = a_PrimitiveType;
+		o_PipelineState.VertexCount = a_VertexCount;
+		o_PipelineState.IndexCount = a_IndexCount;
+		o_PipelineState.Indices = a_Indices;
+		o_PipelineState.IndexType = a_IndexType;
+
+		const IndexerFn Indexer = GetIndexerFn( o_PipelineState.IndexType );
+
+		if ( !Indexer )
+		{
+			Error::SetLastError( Error_UnsupportedIndexType );
+			return false;
+		}
+
+		o_PipelineState.Indexer = Indexer;
+
+		for ( uint32_t i = 0u; i < SHADER_STAGE_COUNT; ++i )
+		{
+			o_PipelineState.Run[ i ] = State.ActiveContext->ActiveShaderProgram->Entries[ i ].Proc->Run;
+		}
+
+		// Initialize values.
+		o_PipelineState.AttribCount = 0u;
+		o_PipelineState.ParamCount = 0u;
+		o_PipelineState.ParameterStride = 0u;
+		o_PipelineState.FlatStride = 0u;
+		o_PipelineState.AffineStride = 0u;
+		o_PipelineState.PerspectiveStride = 0u;
+
+		// If clipping enabled, this needs to be able to grow.
+		TODO( "make this better and smarter. There should be some way of being prepared for clipping." );
+		o_PipelineState.ProcessedVerts.resize( o_PipelineState.VertexCount );
+
+		// Start populating attributes.
+		for ( uint32_t i = 0u; i < MAX_SHADER_ATTRIBUTES; ++i )
+		{
+			if ( !o_PipelineState.VertexArray->Attribs[ i ].Enabled )
+			{
+				continue;
+			}
+
+			const VertexAttrib& Attrib = o_PipelineState.VertexArray->Attribs[ i ];
+			AttribSetter& Setter = o_PipelineState.AttribSetters[ o_PipelineState.AttribCount++ ];
+			Setter.Input = Attrib.Buffer->Data.data() + Attrib.Offset;
+			Setter.Output = State.ActiveContext->ActiveShaderProgram->Attributes[ i ].value().Data;
+			Setter.Stride = Attrib.Stride;
+			Setter.SetterFn = GetAttribSetterFn( Attrib.DataType );
+		}
+
+		// Start populating parameters.
+		uint32_t ParameterStride = 0u;
+
+		for ( uint32_t i = 0u; i < MAX_SHADER_PARAMETERS; ++i )
+		{
+			// If there is a parameter that doesn't have a value, it means we have hit the end of the list.
+			// There are never gaps in the parameters array since they are location-less.
+			if ( !State.ActiveContext->ActiveShaderProgram->Parameters[ i ].has_value() )
+			{
+				break;
+			}
+
+			++o_PipelineState.ParamCount;
+
+			const ShaderProgramParameter& Parameter = o_PipelineState.ShaderProgram->Parameters[ i ].value();
+			const uint32_t ParameterSize /*in floats*/ = Parameter.Size /*in bytes*/ / sizeof( float );
+
+			o_PipelineState.ParamGetters[ i ].Input = Parameter.DataVertex;
+			o_PipelineState.ParamGetters[ i ].Size = Parameter.Size;
+
+			if ( Parameter.InterpQual == EShaderInterpQual::Flat ) o_PipelineState.FlatStride += ParameterSize;
+			else if ( Parameter.InterpQual == EShaderInterpQual::Affine ) o_PipelineState.AffineStride += ParameterSize;
+			else if ( Parameter.InterpQual == EShaderInterpQual::Perspective ) o_PipelineState.PerspectiveStride += ParameterSize;
+
+			o_PipelineState.ParamSetters[ i ].Output = Parameter.DataFragment;
+			o_PipelineState.ParamSetters[ i ].Offset = ParameterStride * sizeof( float );
+			o_PipelineState.ParamSetters[ i ].Size = Parameter.Size;
+			
+			ParameterStride += ParameterSize;
+		}
+
+		o_PipelineState.ParameterStride = ParameterStride;
+
+		// We need to reserve space for all parameters, but like above, need additional space for clipping data.
+		o_PipelineState.ParamData.resize( o_PipelineState.ParameterStride * o_PipelineState.VertexCount );
+
+		// We can now set all of the param setter strides since we know how much data total it occupies per set.
+		ParameterStride = 0u;
+
+		for ( uint32_t i = 0u; i < o_PipelineState.ParamCount; ++i )
+		{
+			o_PipelineState.ParamGetters[ i ].Output = o_PipelineState.ParamData.data() + ParameterStride;
+			o_PipelineState.ParamGetters[ i ].Stride /*in bytes*/ = o_PipelineState.ParameterStride * sizeof( float ) /*in bytes*/;
+			ParameterStride += o_PipelineState.ParamGetters[ i ].Size;
+		}
+
+		o_PipelineState.VertPos = ( const glm::vec4* )State.ActiveContext->ActiveShaderProgram->InbuiltVars[ ( size_t )EShaderInbuiltVar::out_vec4_VertPos ];
+		o_PipelineState.FragColour = ( const glm::vec4* )State.ActiveContext->ActiveShaderProgram->InbuiltVars[ ( size_t )EShaderInbuiltVar::out_vec4_FragColour ];
+
+		TODO( "Should this be a view port section inside of window?" );
+		Window* ActiveWindow = ConsoleGL::GetActiveWindow();
+		o_PipelineState.ViewportW = ConsoleGL::GetWindowWidth( ActiveWindow );
+		o_PipelineState.ViewportH = ConsoleGL::GetWindowHeight( ActiveWindow );
+
+		TODO( "make this query context settings and potentially setup functions to deal with these." );
+		//o_PipelineState.Settings = Get settings from context
+
+		return true;
+	}
+
+	template < EPrimitiveType _Mode >
+	void PrimitiveRenderer( PipelineState& );
+
+	template <>
+	void PrimitiveRenderer< EPrimitiveType::Points >( PipelineState& a_PipelineState ) {}
+
+	template <>
+	void PrimitiveRenderer< EPrimitiveType::Lines >( PipelineState& a_PipelineState ) {}
+
+	template <>
+	void PrimitiveRenderer< EPrimitiveType::Triangles >( PipelineState& a_PipelineState )
+	{
+		const uint64_t Index0 = a_PipelineState.Indexer( a_PipelineState.Indices );
+		const uint64_t Index1 = a_PipelineState.Indexer( a_PipelineState.Indices );
+		const uint64_t Index2 = a_PipelineState.Indexer( a_PipelineState.Indices );
+
+		glm::vec4 Verts[ 3u ];
+		Verts[ 0u ] = a_PipelineState.ProcessedVerts[ Index0 ];
+		Verts[ 1u ] = a_PipelineState.ProcessedVerts[ Index1 ];
+		Verts[ 2u ] = a_PipelineState.ProcessedVerts[ Index2 ];
+
+		const float* Params[ 3u ];
+		Params[ 0u ] = a_PipelineState.ParamData.data() + Index0 * a_PipelineState.ParameterStride;
+		Params[ 1u ] = a_PipelineState.ParamData.data() + Index1 * a_PipelineState.ParameterStride;
+		Params[ 2u ] = a_PipelineState.ParamData.data() + Index2 * a_PipelineState.ParameterStride;
+
+		const auto RasterFn = +[]( const glm::vec4& a_VertPos, const float* a_Params, const uint32_t, void* a_State )
+		{
+			const PipelineState& State = *( PipelineState* )a_State;
+
+			// Setup inbuilts for fragment shader...
+			// ...
+
+			// Setup parameter inputs.
+			for ( uint32_t i = 0u; i < State.ParamCount; ++i )
+			{
+				RunParamSetter( State.ParamSetters[ i ], a_Params );
+			}
+			
+			// Run fragment shader.
+			State.Run[ ( size_t )EShaderType::Fragment ]();
+
+			// Get data from inbuilts...
+			// ...
+
+			const Colour FragColour{ State.FragColour->r, State.FragColour->g, State.FragColour->b, State.FragColour->a };
+			Pixel FragPixel = *ConsoleGL::MapColourToPixel( FragColour );
+
+			ConsoleGL::SetPixelByPosition(ConsoleGL::GetWindowBuffer(ConsoleGL::GetActiveWindow()), Coord(a_VertPos.x, a_VertPos.y), FragPixel);
+		};
+
+		ConsoleGL::Rasterize( 
+			Verts, 
+			Params, 
+			a_PipelineState.FlatStride, 
+			a_PipelineState.AffineStride, 
+			a_PipelineState.PerspectiveStride, 
+			RasterFn, 
+			&a_PipelineState 
+		);
+	}
+
+	using PrimitiveRendererFn = void(*)( PipelineState& );
+
+	PrimitiveRendererFn GetPrimitiveRendererFn( const EPrimitiveType a_PrimitiveType )
+	{
+		static const PrimitiveRendererFn PrimitiveRenderers[]
+		{
+			PrimitiveRenderer< EPrimitiveType::Points >,
+			PrimitiveRenderer< EPrimitiveType::Lines >,
+			PrimitiveRenderer< EPrimitiveType::Triangles >,
+		};
+
+		return PrimitiveRenderers[ ( size_t )a_PrimitiveType ];
+	}
+
+	void RunVertexPipeline( PipelineState& a_PipelineState )
+	{
+		for ( uint32_t i = 0u; i < a_PipelineState.VertexCount; ++i )
+		{
+			// Set all of the attributes for this vertex.
+			for ( uint32_t j = 0u; j < a_PipelineState.AttribCount; ++j )
+			{
+				IncrementAttribSetter( a_PipelineState.AttribSetters[ j ] );
+			}
+
+			// Run the vertex shader.
+			a_PipelineState.Run[ ( size_t )EShaderType::Vertex ]();
+
+			// Collect the vertex and convert to (x/w, y/w, z/w, 1/w)
+			glm::vec4 VertPos = *a_PipelineState.VertPos;
+			VertPos.w = 1.0f / VertPos.w;
+			VertPos.x *= VertPos.w;
+			VertPos.y *= VertPos.w;
+			VertPos.z *= VertPos.w;
+
+			// Store it in processed vertices.
+			a_PipelineState.ProcessedVerts[ i ] = VertPos;
+
+			// Process parameters.
+			for ( uint32_t j = 0u; j < a_PipelineState.ParamCount; ++j )
+			{
+				IncrementParamGetter( a_PipelineState.ParamGetters[ j ] );
+			}
+		}
+
+		// Now we need to run the clipping pipeline on the primitives.
+		// This needs to be done here so we can handle generated vertices
+		// and run the vertex shader over those as well.
+		// Need to update VertCount to new number.
+	}
+
+	void RunFragmentPipeline( PipelineState& a_PipelineState )
+	{
+		const float WidthAdjust = 0.5f * ( a_PipelineState.ViewportW - 1.0f );
+		const float HeightAdjust = -0.5f * ( a_PipelineState.ViewportH - 1.0f );
+
+		// Need to convert all vertices into screen space coordinates.
+		for ( uint32_t i = 0u; i < a_PipelineState.VertexCount; ++i )
+		{
+			glm::vec4& VertPos = a_PipelineState.ProcessedVerts[ i ];
+
+			// Adjust coordinates into [0,w) and [0,h)
+			VertPos.x += 1.0f;
+			VertPos.y -= 1.0f;
+			VertPos.x *= WidthAdjust;
+			VertPos.y *= HeightAdjust;
+		}
+
+		// Get indices per primitive.
+		const uint32_t IndicesPerPrimitive = GetIndicesPerPrimitiveType( a_PipelineState.PrimitiveType );
+		const uint32_t PrimitiveCount = a_PipelineState.IndexCount / IndicesPerPrimitive;
+		const PrimitiveRendererFn PrimitiveRenderer = GetPrimitiveRendererFn( a_PipelineState.PrimitiveType );
+
+		// Run over initial vertices.
+		for ( uint32_t i = 0u; i < PrimitiveCount; ++i )
+		{
+			PrimitiveRenderer( a_PipelineState );
+		}
+
+		// Run over generated vertices.
+		// ...
+	}
 }
-
-void DestructorWindow( ConsoleGL::Window* a_Window ) {}
-void DestructorContext( ConsoleGL::Context* a_Context ) {}
-void DestructorShader( ConsoleGL::Shader* a_Shader ) {}
-void DestructorShaderProgram( ConsoleGL::ShaderProgram* a_ShaderProgram ) {}
-
-// Define repositories for each object.
-DEFINE_REPOSITORY( Window, WINDOW_MAX_COUNT );
-DEFINE_REPOSITORY( Context, CONTEXT_MAX_COUNT );
-DEFINE_REPOSITORY( Shader, SHADER_MAX_COUNT );
-DEFINE_REPOSITORY( ShaderProgram, SHADER_PROGRAM_MAX_COUNT );
-
-struct
-{
-	WindowRepository				Windows;
-	ContextRepository				Contexts;
-	ShaderRepository				Shaders;
-	ShaderProgramRepository			ShaderPrograms;
-	ConsoleGL::WindowHandle			ActiveWindow;
-	ConsoleGL::ContextHandle		ActiveContext;
-} static State;
 
 #pragma region Window functions
 
 bool ReturnWindow( const ConsoleGL::WindowHandle a_Window )
 {
-	if ( State.ActiveWindow != a_Window )
+	if ( ConsoleGL::State.ActiveWindow != a_Window )
     {
 	    return true;
     }
@@ -918,19 +1470,19 @@ bool ReturnWindow( const ConsoleGL::WindowHandle a_Window )
     ENSURE_LOG( !( !a_Window->CommandReady.Trigger() || !a_Window->CommandComplete.Wait() ), "Failed to trigger console dock attach." );
     ENSURE_LOG( FreeConsole(), "Failed to free console window." );
 
-    State.ActiveWindow = nullptr;
+	ConsoleGL::State.ActiveWindow = nullptr;
 
     return true;
 }
 
 bool BorrowWindow( const ConsoleGL::WindowHandle a_Window )
 {
-	if ( State.ActiveWindow == a_Window )
+	if ( ConsoleGL::State.ActiveWindow == a_Window )
     {
 	    return true;
     }
 
-    ENSURE_LOG( !( State.ActiveWindow && !ReturnWindow( State.ActiveWindow ) ), "Failed to return currently borrowed console window." );
+    ENSURE_LOG( !( ConsoleGL::State.ActiveWindow && !ReturnWindow( ConsoleGL::State.ActiveWindow ) ), "Failed to return currently borrowed console window." );
 	ENSURE_LOG( AttachConsole( a_Window->ProcessInfo.dwProcessId ), "Failed to attach console window." );
 
     // Set command.
@@ -939,11 +1491,10 @@ bool BorrowWindow( const ConsoleGL::WindowHandle a_Window )
     
     ENSURE_LOG( a_Window->CommandReady.Trigger(), "Failed to trigger console dock release." );
     ENSURE_LOG( a_Window->CommandComplete.Wait(), "Failed to wait for console dock release." );
-    
-    State.ActiveWindow = a_Window;
+
+	ConsoleGL::State.ActiveWindow = a_Window;
     return true;
 }
-
 
 ConsoleGL::Window* ConsoleGL::CreateWindow( const char* a_Title, const uint32_t a_Width, const uint32_t a_Height, const uint32_t a_PixelWidth, const uint32_t a_PixelHeight, const uint32_t a_BufferCount )
 {
@@ -3186,283 +3737,12 @@ bool ConsoleGL::VertexAttribPointer( const uint32_t a_Location, const uint32_t a
 	return true;
 }
 
-#pragma region TESTING_DELETE_LATER
-
-using AttribWalkerFn = void( * )( const void*&, void*, const uint32_t );
-
-AttribWalkerFn GetAttribWalkerFn( const ConsoleGL::EDataType a_DataType )
+namespace ConsoleGL
 {
-#define FUNC_RETURN( Type ) \
-	return +[]( const void*& a_Input, void* a_Output, const uint32_t a_Stride ) { \
-		*static_cast< Type* >( a_Output ) = *static_cast< const Type* >( a_Input ); \
-		a_Input = static_cast< const uint8_t* >( a_Input ) + a_Stride; \
-		};
-
-	switch ( a_DataType )
-	{
-	case ConsoleGL::EDataType::Custom:
-		return nullptr;
-	case ConsoleGL::EDataType::Int8:
-	case ConsoleGL::EDataType::Int16:
-		return nullptr;
-	case ConsoleGL::EDataType::Int32:
-	case ConsoleGL::EDataType::Int64:
-	case ConsoleGL::EDataType::Uint8:
-	case ConsoleGL::EDataType::Uint16:
-	case ConsoleGL::EDataType::Uint32:
-	case ConsoleGL::EDataType::Uint64:
-	case ConsoleGL::EDataType::Float:
-	case ConsoleGL::EDataType::Double:
-	case ConsoleGL::EDataType::Bool:
-	case ConsoleGL::EDataType::Mat2:
-	case ConsoleGL::EDataType::Mat3:
-	case ConsoleGL::EDataType::Mat4:
-	case ConsoleGL::EDataType::Mat2x3:
-	case ConsoleGL::EDataType::Mat2x4:
-	case ConsoleGL::EDataType::Mat3x2:
-	case ConsoleGL::EDataType::Mat3x4:
-	case ConsoleGL::EDataType::Mat4x2:
-	case ConsoleGL::EDataType::Mat4x3:
-	case ConsoleGL::EDataType::Dmat2:
-	case ConsoleGL::EDataType::Dmat3:
-	case ConsoleGL::EDataType::Dmat4:
-	case ConsoleGL::EDataType::Dmat2x3:
-	case ConsoleGL::EDataType::Dmat2x4:
-	case ConsoleGL::EDataType::Dmat3x2:
-	case ConsoleGL::EDataType::Dmat3x4:
-	case ConsoleGL::EDataType::Dmat4x2:
-	case ConsoleGL::EDataType::Dmat4x3:
-	case ConsoleGL::EDataType::Vec2:
-		return nullptr;
-	case ConsoleGL::EDataType::Vec3:
-		FUNC_RETURN( glm::vec3 );
-	case ConsoleGL::EDataType::Vec4:
-	case ConsoleGL::EDataType::Dvec2:
-	case ConsoleGL::EDataType::Dvec3:
-	case ConsoleGL::EDataType::Dvec4:
-	case ConsoleGL::EDataType::Ivec2:
-	case ConsoleGL::EDataType::Ivec3:
-	case ConsoleGL::EDataType::Ivec4:
-	case ConsoleGL::EDataType::Uvec2:
-	case ConsoleGL::EDataType::Uvec3:
-	case ConsoleGL::EDataType::Uvec4:
-		return nullptr;
-	default: return nullptr;
-	}
-}
-
-struct AttribWalker
-{
-	uint32_t Stride = 0u;
-	const void* Input = nullptr;
-	void* Output = nullptr;
-	AttribWalkerFn Fn = nullptr;
-};
-
-struct ParamWalker
-{
-	uint32_t Size = 0u;
-	uint32_t Stride = 0u;
-	const void* Input = nullptr;
-	void* Output = nullptr;
-};
-
-void IncrementParamWalker( ParamWalker* pw )
-{
-	memcpy( pw->Output, pw->Input, pw->Size );
-	pw->Output = static_cast< uint8_t* >( pw->Output ) + pw->Stride;
-}
-
-using IndexWalkerFn = uint64_t(*)( const void*& );
-
-IndexWalkerFn GetIndexWalkerFn( const ConsoleGL::EDataType a_DataType )
-{
-#define FN_RETURN( Type ) \
-	return +[]( const void*& a_Data ) { uint64_t Index = *static_cast< const Type* >( a_Data ); a_Data = static_cast< const Type* >( a_Data ) + 1; return Index; };
-
-	switch ( a_DataType )
-	{
-	case ConsoleGL::EDataType::Int8:
-		FN_RETURN( int8_t );
-	case ConsoleGL::EDataType::Int16:
-		FN_RETURN( int16_t );
-	case ConsoleGL::EDataType::Int32:
-		FN_RETURN( int32_t );
-	case ConsoleGL::EDataType::Int64:
-		FN_RETURN( int64_t );
-	case ConsoleGL::EDataType::Uint8:
-		FN_RETURN( uint8_t );
-	case ConsoleGL::EDataType::Uint16:
-		FN_RETURN( uint16_t );
-	case ConsoleGL::EDataType::Uint32:
-		FN_RETURN( uint32_t );
-	case ConsoleGL::EDataType::Uint64:
-		FN_RETURN( uint64_t );
-	default: return nullptr;
-	}
 	
-#undef FN_RETURN
 }
 
-struct DrawContext
-{
-	ConsoleGL::ShaderProcRunFn Run;
-	ConsoleGL::ShaderProcRunFn FragRun;
-	const glm::vec4* VertPos;
-	AttribWalker Walkers[ MAX_SHADER_ATTRIBUTES ];
-	uint32_t AttribCount;
-	uint32_t VertexCount;
-	uint32_t TotalParamSize;
-	ParamWalker ParamWalkers[ MAX_SHADER_PARAMETERS ];
-	uint32_t ParamCount;
-	const void* Indices;
-	IndexWalkerFn IndexWalker;
-	uint32_t ParamStride;
-	std::vector< glm::vec4 > Verts;
-	std::vector< float > Data;
-	uint32_t w,h;
-};
-
-void ProcessTriangleIndices( DrawContext& Context )
-{
-	Context.Verts.resize( Context.VertexCount );
-	
-	for ( uint32_t j = 0u; j < Context.VertexCount; ++j )
-	{
-		for ( uint32_t i = 0u; i < Context.AttribCount; ++i )
-		{
-			auto& walker = Context.Walkers[ i ];
-			walker.Fn( walker.Input, walker.Output, walker.Stride );
-		}
-
-		Context.Run();
-		Context.Verts[ j ] = *Context.VertPos;
-
-		for ( uint32_t i = 0u; i < Context.AttribCount; ++i )
-		{
-			IncrementParamWalker( &Context.ParamWalkers[ i ] );
-		}
-	}
-}
-
-void ProcessTriangles( DrawContext& Context )
-{
-	const uint32_t TriangleCount = Context.VertexCount / 3;
-
-	for ( uint32_t i = 0; i < TriangleCount; ++i )
-	{
-		const uint32_t I0 = Context.IndexWalker(Context.Indices);
-		const uint32_t I1 = Context.IndexWalker(Context.Indices);
-		const uint32_t I2 = Context.IndexWalker(Context.Indices);
-
-		float* Params0 = Context.ParamStride == 0u ? nullptr : &Context.Data[ I0 * Context.ParamStride / sizeof( float ) ];
-		float* Params1 = Context.ParamStride == 0u ? nullptr : &Context.Data[ I1 * Context.ParamStride / sizeof( float ) ];
-		float* Params2 = Context.ParamStride == 0u ? nullptr : &Context.Data[ I2 * Context.ParamStride / sizeof( float ) ];
-
-		// Verts in clip space.
-		glm::vec4 VertPos0 = Context.Verts[ I0 ];
-		glm::vec4 VertPos1 = Context.Verts[ I1 ];
-		glm::vec4 VertPos2 = Context.Verts[ I2 ];
-
-		const float inv_w0 = 1.0f / VertPos0.w;
-		const float inv_w1 = 1.0f / VertPos1.w;
-		const float inv_w2 = 1.0f / VertPos2.w;
-
-		for ( uint32_t j = 0u; j < Context.ParamStride / sizeof( float ); ++j )
-		{
-			//Params0[ j ] *= inv_w0;
-			//Params1[ j ] *= inv_w1;
-			//Params2[ j ] *= inv_w2;
-		}
-
-		// Verts in NDC space.
-		VertPos0 *= inv_w0;
-		VertPos1 *= inv_w1;
-		VertPos2 *= inv_w2;
-
-		VertPos0.w = inv_w0;
-		VertPos1.w = inv_w1;
-		VertPos2.w = inv_w2;
-
-		// Clip the triangle.
-		// ...
-
-		// Convert to screen space.
-		VertPos0 += glm::vec4{ 1.0f, 1.0f, 0.0f, 0.0f };
-		VertPos1 += glm::vec4{ 1.0f, 1.0f, 0.0f, 0.0f };
-		VertPos2 += glm::vec4{ 1.0f, 1.0f, 0.0f, 0.0f };
-		
-		VertPos0 *= glm::vec4{ 0.5f * ( float )Context.w, 0.5f * ( float )Context.h, 1.0f, 1.0f };
-		VertPos1 *= glm::vec4{ 0.5f * ( float )Context.w, 0.5f * ( float )Context.h, 1.0f, 1.0f };
-		VertPos2 *= glm::vec4{ 0.5f * ( float )Context.w, 0.5f * ( float )Context.h, 1.0f, 1.0f };
-
-		ConsoleGL::Tri t;
-		t.p0 = ConsoleGL::Coord( VertPos0.x, VertPos0.y );
-		t.p1 = ConsoleGL::Coord( VertPos1.x, VertPos1.y );
-		t.p2 = ConsoleGL::Coord( VertPos2.x, VertPos2.y );
-
-		t.p0.y = Context.h - t.p0.y;
-		t.p1.y = Context.h - t.p1.y;
-		t.p2.y = Context.h - t.p2.y;
-
-
-
-		
-
-		struct Payload
-		{
-			float y1;
-			float y2;
-			float y3;
-			float x1;
-			float x2;
-			float x3;
-
-			float denom;
-			glm::vec3 c1;
-			glm::vec3 c2;
-			glm::vec3 c3;
-
-		} payload;
-
-		
-		payload.y1 = t.p0.y;
-		payload.y2 = t.p1.y;
-		payload.y3 = t.p2.y;
-		payload.x1 = t.p0.x;
-		payload.x2 = t.p1.x;
-		payload.x3 = t.p2.x;
-		payload.denom = (payload.y2-payload.y3)*(payload.x1-payload.x3)+(payload.x3-payload.x2)*(payload.y1-payload.y3);
-		payload.c1 = *(glm::vec3*)Params0;
-		payload.c2 = *(glm::vec3*)Params1;
-		payload.c3 = *(glm::vec3*)Params2;
-
-		ConsoleGL::FragmentFn FragFn = +[]( ConsoleGL::Coord c, void* s) -> ConsoleGL::Pixel
-		{
-			Payload* sp = ( Payload* )s;
-
-			const float Lam1 = ((sp->y2-sp->y3)*((float)c.x-sp->x3)+(sp->x3-sp->x2)*((float)c.y-sp->y3))/sp->denom;
-			const float Lam2 = ((sp->y3-sp->y1)*((float)c.x-sp->x3)+(sp->x1-sp->x3)*((float)c.y-sp->y3))/sp->denom;
-			const float Lam3 = 1.0f - Lam1 - Lam2;
-
-			glm::vec3 Col = Lam1 * sp->c1 + Lam2 * sp->c2 + Lam3 * sp->c3;
-			return *ConsoleGL::MapColourToPixel({ Col.x, Col.y, Col.z, 1.0f});
-		};
-
-		ConsoleGL::DrawTriangleFilledFn( ConsoleGL::GetWindowBuffer( ConsoleGL::GetActiveWindow() ), t, FragFn, &payload );
-
-		float Params[ 256 ];
-
-		if ( VertPos0.x > 0 )
-		{
-			
-		}
-	}
-}
-
-#pragma endregion
-
-bool ConsoleGL::DrawElements( const ERenderMode a_Mode, const uint32_t a_Count, const EDataType a_DataType, const void* a_Indices )
+bool ConsoleGL::DrawElements( const EPrimitiveType a_PrimitiveType, const uint32_t a_VertexCount, const uint32_t a_IndexCount, const void* a_Indices, const EDataType a_IndexType )
 {
 	if ( !State.ActiveContext )
 	{
@@ -3470,91 +3750,26 @@ bool ConsoleGL::DrawElements( const ERenderMode a_Mode, const uint32_t a_Count, 
 		return false;
 	}
 
-	const IndexWalkerFn IndexWalker = GetIndexWalkerFn( a_DataType );
-
-	if ( !IndexWalker )
+	if ( !State.ActiveContext->ActiveShaderProgram )
 	{
-		Error::SetLastError( Error_UnsupportedDataType );
+		Error::SetLastError( Error_NoActiveShaderProgram );
 		return false;
 	}
 
-	DrawContext c;
-	c.Run = State.ActiveContext->ActiveShaderProgram->Entries[ ( size_t )EShaderType::Vertex ].Proc->Run;
-	c.FragRun = State.ActiveContext->ActiveShaderProgram->Entries[ ( size_t )EShaderType::Fragment ].Proc->Run;
-	c.VertPos = ( const glm::vec4* )State.ActiveContext->ActiveShaderProgram->InbuiltVars[ ( size_t )EShaderInbuiltVar::out_vec4_VertPos ];
-	c.AttribCount = 0u;
-	c.VertexCount = a_Count;
+	PipelineState Pipeline;
 
-	const VertexArrayHandle VA = State.ActiveContext->ActiveVertexArray ? State.ActiveContext->ActiveVertexArray : &State.ActiveContext->DefaultVertexArray;
-	uint32_t CurrentOffset = 0u;
-	for ( uint32_t i = 0u; i < MAX_SHADER_ATTRIBUTES; ++i )
+	Pipeline.ShaderProgram = State.ActiveContext->ActiveShaderProgram;
+	Pipeline.VertexArray = State.ActiveContext->ActiveVertexArray ? State.ActiveContext->ActiveVertexArray : &State.ActiveContext->DefaultVertexArray;
+	
+	// Need to ascertain the total amount of vertices.
+
+	if ( !InitPipelineState( Pipeline, a_PrimitiveType, a_VertexCount, a_IndexCount, a_Indices, a_IndexType ) )
 	{
-		if ( VA->Attribs[ i ].Enabled )
-		{
-			auto& attr = VA->Attribs[ i ];
-			auto& walk = c.Walkers[ c.AttribCount++ ];
-
-			walk.Fn = GetAttribWalkerFn( attr.DataType );
-			walk.Input = attr.Buffer->Data.data() + CurrentOffset;
-			walk.Output = State.ActiveContext->ActiveShaderProgram->Attributes[ i ].value().Data;
-			walk.Stride = attr.Stride;
-
-			CurrentOffset += attr.Size * 12;
-		}
+		return false;
 	}
 
-	uint32_t Stride = 0u;
-	uint32_t Offset = 0u;
-	c.TotalParamSize = 0u;
-	c.ParamCount = 0u;
-
-	for ( uint32_t i = 0; i < MAX_SHADER_PARAMETERS; ++i )
-	{
-		if ( !State.ActiveContext->ActiveShaderProgram->Parameters[ i ].has_value() )
-		{
-			break;
-		}
-
-		auto& param = State.ActiveContext->ActiveShaderProgram->Parameters[ i ].value();
-
-		c.TotalParamSize+= param.Size;
-	}
-
-	c.Data.resize( c.TotalParamSize * c.VertexCount / sizeof( float ) );
-
-	for ( uint32_t i = 0; i < MAX_SHADER_PARAMETERS; ++i )
-	{
-		if ( !State.ActiveContext->ActiveShaderProgram->Parameters[ i ].has_value() )
-		{
-			break;
-		}
-
-		auto& param = State.ActiveContext->ActiveShaderProgram->Parameters[ i ].value();
-
-		auto& pw = c.ParamWalkers[ c.ParamCount++ ];
-		pw.Input = param.DataVertex;
-		pw.Size = param.Size;
-
-		Stride += pw.Size;
-		c.ParamWalkers[ i ].Output = ( uint8_t* )c.Data.data() + Offset;
-		Offset += pw.Size;
-	}
-
-	for ( uint32_t i = 0u; i < c.ParamCount; ++i )
-	{
-		c.ParamWalkers[ i ].Stride = Stride;
-	}
-
-	c.ParamStride = Stride;
-	c.IndexWalker = GetIndexWalkerFn( a_DataType );
-	c.Indices = a_Indices;
-
-	c.w = ConsoleGL::GetWindowWidth( ConsoleGL::GetActiveWindow() ) - 1;
-	c.h = ConsoleGL::GetWindowHeight( ConsoleGL::GetActiveWindow() ) - 1;
-
-	ProcessTriangleIndices( c );
-	ProcessTriangles( c );
-
+	RunVertexPipeline( Pipeline );
+	RunFragmentPipeline( Pipeline );
 	return true;
 }
 
@@ -3796,30 +4011,6 @@ bool ConsoleGL::GetUniformSize( const ShaderProgramHandle a_ShaderProgram, const
 	Error::SetLastError( Error_UniformIndexOutOfRange );
 	return false;
 }
-
-#define UNIFORM_CHECK() \
-	if ( !State.ActiveContext ) \
-	{ \
-		Error::SetLastError( Error_NoActiveContext ); \
-		return; \
-	} \
- \
-	if ( !State.ActiveContext->ActiveShaderProgram ) \
-	{ \
-		Error::SetLastError( Error_NoActiveShaderProgram ); \
-		return; \
-	} \
- \
-	const auto& Uniform = State.ActiveContext->ActiveShaderProgram->Uniforms[ a_Location ]; \
- \
-	if ( !Uniform.has_value() ) \
-	{ \
-		Error::SetLastError( Error_InvalidUniformLocation ); \
-		return; \
-	} \
-
-#define SET_UNIFORM_VAL( Type, Index, Val ) \
-	static_cast< Type* >( Uniform.value().Data )[ Index ] = Val
 
 void ConsoleGL::Uniform1f( const int32_t a_Location, const float a_V0 )
 {
@@ -4156,9 +4347,6 @@ void ConsoleGL::UniformMatrix4x3fv( const int32_t a_Location, const uint32_t a_C
 	for ( uint32_t i = 0u; i < a_Count * 12u; ++i )
 		SET_UNIFORM_VAL( float, i, a_Value[ i ] );
 }
-
-#undef UNIFORM_CHECK
-#undef SET_UNIFORM_VAL
 
 int32_t ConsoleGL::GetAttribLocation( const ShaderProgramHandle a_ShaderProgram, const char* a_Name )
 {
@@ -4640,180 +4828,5 @@ bool ConsoleGL::GetParamSize( const ShaderProgramHandle a_ShaderProgram, const u
 
 #pragma endregion
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#include <glm/gtc/matrix_transform.hpp>
-
-void ConsoleGL::RunTest()
-{
-	int Width = 160, Height = 90;
-
-	// Create window.
-	ConsoleGL::Window* window0 = ConsoleGL::CreateWindow( "window0", Width, Height, 8, 8, 2 );
-	ConsoleGL::SetActiveWindow( window0 );
-	ConsoleGL::SetWindowColoursFromSet( ConsoleGL::EColourSet::DEFAULT );
-
-	// Create a graphics context.
-	ConsoleGL::Context* Context = ConsoleGL::CreateContext();
-	ConsoleGL::SetActiveContext( Context );
-
-	// Create a shader program.
-	ConsoleGL::ShaderProgram* DefaultShaderProgram = ConsoleGL::CreateShaderProgram();
-
-	// Create vertex shader.
-	ConsoleGL::Shader* DefaultVertexShader = ConsoleGL::CreateShader( ConsoleGL::EShaderType::Vertex );
-	const std::string VertexShaderSource = R"(
-
-uniform(0) mat4 P;
-uniform(1) mat4 V;
-uniform(2) mat4 M;
-
-attrib(0) vec3 Position;
-attrib(1) vec3 Colour;
-
-out vec4 VertPos;
-affn out vec3 VertexColour;
-
-void run()
-{
-	VertPos = P * V * M * vec4(Position, 1.0f);
-	VertexColour = Colour;
-}
-)";
-
-	ConsoleGL::SetShaderSourceFromString( DefaultVertexShader, VertexShaderSource.c_str(), VertexShaderSource.size() );
-	ConsoleGL::CompileShader( DefaultVertexShader );
-	ConsoleGL::AttachShader( DefaultShaderProgram, DefaultVertexShader );
-
-	// Create fragment shader.
-	ConsoleGL::Shader* DefaultFragmentShader = ConsoleGL::CreateShader( ConsoleGL::EShaderType::Fragment );
-	const std::string FragmentShaderSource = R"(
-
-out vec4 FragColour;
-in vec3 VertexColour;
-
-void run()
-{
-	FragColour = vec4(VertexColour, 1.0f);
-}
-)";
-
-	ConsoleGL::SetShaderSourceFromString( DefaultFragmentShader, FragmentShaderSource.c_str(), FragmentShaderSource.size() );
-	ConsoleGL::CompileShader( DefaultFragmentShader );
-	ConsoleGL::AttachShader( DefaultShaderProgram, DefaultFragmentShader );
-
-	// Link the shader program.
-	ConsoleGL::LinkProgram( DefaultShaderProgram );
-
-	ConsoleGL::DetachShader( DefaultShaderProgram, DefaultVertexShader );
-	ConsoleGL::DeleteShader( DefaultVertexShader );
-	ConsoleGL::DetachShader( DefaultShaderProgram, DefaultFragmentShader );
-	ConsoleGL::DeleteShader( DefaultFragmentShader );
-
-	const float Vertices[] = {
-		-0.5f, +0.5f, +0.5f, 0.0f, 1.0f, 1.0f, // Top left front
-		+0.5f, +0.5f, +0.5f, 1.0f, 1.0f, 1.0f, // Top right front
-		+0.5f, +0.5f, -0.5f, 1.0f, 1.0f, 0.0f, // Top right back
-		-0.5f, +0.5f, -0.5f, 0.0f, 1.0f, 0.0f, // Top left back
-		-0.5f, -0.5f, +0.5f, 0.0f, 0.0f, 1.0f, // Bot left front
-		+0.5f, -0.5f, +0.5f, 1.0f, 0.0f, 1.0f, // Bot right front
-		+0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f, // Bot right back
-		-0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 0.0f, // Bot left back
-	};
-
-	const int32_t Indices[] = {
-		0, 1, 2, 0, 2, 3,
-		4, 5, 1, 4, 1, 0,
-		7, 6, 5, 7, 5, 4,
-		3, 2, 6, 3, 6, 7,
-		4, 0, 3, 4, 3, 7,
-		1, 5, 6, 1, 6, 2
-	};
-
-	// Create a vbo.
-	BufferHandle VBO;
-	ConsoleGL::CreateBuffers( 1, &VBO );
-	ConsoleGL::BindBuffer( EBufferTarget::ArrayBuffer, VBO );
-	ConsoleGL::BufferData( EBufferTarget::ArrayBuffer, sizeof( Vertices ), Vertices );
-	ConsoleGL::BindBuffer( EBufferTarget::ArrayBuffer, nullptr );
-;
-	VertexArrayHandle VAO;
-	ConsoleGL::CreateVertexArrays( 1, &VAO );
-	ConsoleGL::BindVertexArray( VAO );
-	ConsoleGL::BindBuffer( EBufferTarget::ArrayBuffer, VBO );
-	ConsoleGL::VertexAttribPointer( 0u, 1u, EDataType::Vec3, false, sizeof( glm::vec3 ) * 2u, 0u );
-	ConsoleGL::VertexAttribPointer( 1u, 1u, EDataType::Vec3, false, sizeof( glm::vec3 ) * 2u, sizeof( glm::vec3 ) );
-	ConsoleGL::BindBuffer( EBufferTarget::ArrayBuffer, nullptr );
-	ConsoleGL::EnableVertexAttribArray( 0u );
-	ConsoleGL::EnableVertexAttribArray( 1u );
-	ConsoleGL::BindVertexArray( nullptr );
-
-	float CameraX = 0.0f, CameraY = 0.0f, CameraZ = 3.0f;
-	float ObjRotX = 0.0f, ObjRotY = 0.0f, ObjRotZ = 0.0f;
-
-	// Use the program now for current context.
-	while ( true )
-	{
-		ConsoleGL::PollEvents();
-		
-		ObjRotZ += 0.005;
-		ObjRotY += 0.01;
-		ObjRotX += 0.001;
-
-		if ( ConsoleGL::IsKeyDown( EKeyboardKey::W ) ) CameraZ -= 0.01f;
-		if ( ConsoleGL::IsKeyDown( EKeyboardKey::S ) ) CameraZ += 0.01f;
-		if ( ConsoleGL::IsKeyDown( EKeyboardKey::A ) ) CameraX -= 0.01f;
-		if ( ConsoleGL::IsKeyDown( EKeyboardKey::D ) ) CameraX += 0.01f;
-		if ( ConsoleGL::IsKeyDown( EKeyboardKey::E ) ) CameraY += 0.01f;
-		if ( ConsoleGL::IsKeyDown( EKeyboardKey::Q ) ) CameraY -= 0.01f;
-
-		float AspectRatio = ( float )Width / Height;
-		float FOV = glm::radians(75.0f);
-		float ZNear = 0.1f;
-		float ZFar = 1000.0f;
-		glm::vec3 CameraPos = { CameraX, CameraY, CameraZ };
-		glm::vec3 ObjectPos = { 0.0f, 0.0f, 0.0f };
-		glm::vec3 ObjectRot = { ObjRotX, ObjRotY, ObjRotZ };
-		glm::vec3 ObjectSca = { 1.0f, 1.0f, 1.0f };
-
-		glm::mat4 M = glm::translate( glm::mat4( 1.0f ), ObjectPos ) * glm::mat4_cast(glm::quat(ObjectRot));
-		glm::mat4 V = glm::lookAt( CameraPos, CameraPos + glm::vec3{ 0.0f, 0.0f, -1.0f }, glm::vec3{ 0.0f, 1.0f, 0.0f } );
-		glm::mat4 P = glm::perspective( FOV, AspectRatio, ZNear, ZFar );
-
-		int32_t MLoc = ConsoleGL::GetUniformLocation( DefaultShaderProgram, "M" );
-		int32_t VLoc = ConsoleGL::GetUniformLocation( DefaultShaderProgram, "V" );
-		int32_t PLoc = ConsoleGL::GetUniformLocation( DefaultShaderProgram, "P" );
-
-		ConsoleGL::UseProgram( DefaultShaderProgram );
-
-		ConsoleGL::UniformMatrix4fv( MLoc, 1, false, &M[ 0 ][ 0 ] );
-		ConsoleGL::UniformMatrix4fv( VLoc, 1, false, &V[ 0 ][ 0 ] );
-		ConsoleGL::UniformMatrix4fv( PLoc, 1, false, &P[ 0 ][ 0 ] );
-
-		ConsoleGL::BindVertexArray( VAO );
-		ConsoleGL::SetBuffer( ConsoleGL::GetWindowBuffer(ConsoleGL::GetActiveWindow()), *ConsoleGL::MapColourToPixel({ 1.0f, 1.0f, 1.0f, 1.0f }));
-		ConsoleGL::DrawElements( ERenderMode::Triangles, 36u, EDataType::Int32, Indices );
-		ConsoleGL::BindVertexArray( nullptr );
-		ConsoleGL::SwapWindowBuffer();
-		ConsoleGL::UseProgram( nullptr );
-	}
-}
+#undef UNIFORM_CHECK
+#undef SET_UNIFORM_VAL

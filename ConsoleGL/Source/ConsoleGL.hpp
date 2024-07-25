@@ -101,6 +101,7 @@ namespace ConsoleGL
 		Error_UnsupportedAttribPointerType,
 		Error_UnsupportedDataType,
 		Error_UnsupportedRenderMode,
+		Error_UnsupportedIndexType,
 
 		Error_UniformIndexOutOfRange,
 		Error_AttributeIndexOutOfRange,
@@ -462,20 +463,27 @@ namespace ConsoleGL
 		Uvec4
 	};
 
-	enum class ERenderMode
+	enum class EPrimitiveType
 	{
-		Point,
-		LineStrip,
-		LineLoop,
+		Points,
+		//LineStrip,
+		//LineLoop,
 		Lines,
-		LineStripAdjacency,
-		LinesAdjacency,
-		TriangleStrip,
-		TriangleFan,
+		//LineStripAdjacency,
+		//LinesAdjacency,
+		//TriangleStrip,
+		//TriangleFan,
 		Triangles,
-		TriangleStripAdjacency,
-		TrainglesAdjacency,
-		Patches
+		//TriangleStripAdjacency,
+		//TrainglesAdjacency,
+		//Patches
+	};
+
+	enum class ERenderSetting
+	{
+		DepthTest,
+		CullFace,
+		Clipping,
 	};
 
 	using FragmentFn = Pixel( * )( Coord a_Coord, void* a_State );
@@ -628,8 +636,8 @@ namespace ConsoleGL
 	CONSOLEGL_API bool EnableVertexAttribArray( uint32_t a_Location );
 	CONSOLEGL_API bool DisableVertexAttribArray( uint32_t a_Location );
 	CONSOLEGL_API bool VertexAttribPointer( uint32_t a_Location, uint32_t a_Size, EDataType a_DataType, bool a_Normalize, uint32_t a_Stride, uint32_t a_Offset );
-	CONSOLEGL_API bool DrawElements( ERenderMode a_Mode, uint32_t a_Count, EDataType a_DataType, const void* a_Indices );
-	//CONSOLEGL_API void Enable( RenderSetting a_RenderSetting );
+	CONSOLEGL_API bool DrawElements( EPrimitiveType a_PrimitiveType, uint32_t a_VertexCount, uint32_t a_IndexCount, const void* a_Indices, EDataType a_IndexType );
+	//CONSOLEGL_API void Enable( RenderSetting a_RenderSetting ); // clipping too
 	//CONSOLEGL_API void Disable( RenderSetting a_RenderSetting );
 	//CONSOLEGL_API void CullFace( CullFaceMode a_CullFace );
 	//CONSOLEGL_API void DepthFunc( TextureSetting a_TextureSetting );
