@@ -635,7 +635,7 @@ namespace ConsoleGL
 	CONSOLEGL_API bool DeleteVertexArrays( uint32_t a_Count, const VertexArrayHandle* a_VertexArrays );
 	CONSOLEGL_API bool EnableVertexAttribArray( uint32_t a_Location );
 	CONSOLEGL_API bool DisableVertexAttribArray( uint32_t a_Location );
-	CONSOLEGL_API bool VertexAttribPointer( uint32_t a_Location, uint32_t a_Size, EDataType a_DataType, bool a_Normalize, uint32_t a_Stride, uint32_t a_Offset );
+	CONSOLEGL_API bool VertexAttribPointer( uint32_t a_Location, uint32_t a_ArrayLength, EDataType a_DataType, bool a_Normalize, uint32_t a_Stride, uint32_t a_Offset );
 	CONSOLEGL_API bool DrawElements( EPrimitiveType a_PrimitiveType, uint32_t a_VertexCount, uint32_t a_IndexCount, const void* a_Indices, EDataType a_IndexType );
 	//CONSOLEGL_API void Enable( RenderSetting a_RenderSetting ); // clipping too
 	//CONSOLEGL_API void Disable( RenderSetting a_RenderSetting );

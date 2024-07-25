@@ -162,11 +162,13 @@ void ConsoleGL::RasterizeAffine( const glm::vec4* a_P, const float** a_Data, con
 
 void ConsoleGL::RasterizePerspective( const glm::vec4* a_P, const float** a_Data, const uint32_t a_Stride, const RasterFn a_RasterFn, void* a_State )
 {
-    float Data0[ 512 ]; memcpy( Data0, a_Data[ 0u ], a_Stride * sizeof( float ) );
-    float Data1[ 512 ]; memcpy( Data1, a_Data[ 1u ], a_Stride * sizeof( float ) );
-    float Data2[ 512 ]; memcpy( Data2, a_Data[ 2u ], a_Stride * sizeof( float ) );
+    float Data0[ 512 ]; memcpy( Data0, a_Data[ 0u ], a_Stride );
+    float Data1[ 512 ]; memcpy( Data1, a_Data[ 1u ], a_Stride );
+    float Data2[ 512 ]; memcpy( Data2, a_Data[ 2u ], a_Stride );
 
-    for ( uint32_t i = 0u; i < a_Stride; ++i )
+    const uint32_t Stride = a_Stride / sizeof( float );
+
+    for ( uint32_t i = 0u; i < Stride; ++i )
     {
 	    Data0[ i ] *= a_P[ 0u ].w;
 	    Data1[ i ] *= a_P[ 1u ].w;
@@ -184,7 +186,7 @@ void ConsoleGL::RasterizePerspective( const glm::vec4* a_P, const float** a_Data
         void* State;
     } State;
 
-	State.Stride = a_Stride;
+	State.Stride = Stride;
 	State.D0 = Data0;
 	State.D1 = Data1;
 	State.D2 = Data2;
@@ -212,12 +214,16 @@ void ConsoleGL::RasterizePerspective( const glm::vec4* a_P, const float** a_Data
 
 void ConsoleGL::Rasterize( const glm::vec4* a_P, const float** a_Data, const uint32_t a_FlatStride, const uint32_t a_AffineStride, const uint32_t a_PerspectiveStride, const RasterFn a_RasterFn, void* a_State )
 {
-    // We only need to create copies of the perspective portion.
-    float Data0[ 512 ]; memcpy( Data0, a_Data[ 0u ] + a_FlatStride + a_AffineStride, a_PerspectiveStride * sizeof( float ) );
-    float Data1[ 512 ]; memcpy( Data1, a_Data[ 1u ] + a_FlatStride + a_AffineStride, a_PerspectiveStride * sizeof( float ) );
-    float Data2[ 512 ]; memcpy( Data2, a_Data[ 2u ] + a_FlatStride + a_AffineStride, a_PerspectiveStride * sizeof( float ) );
+    const uint32_t FlatStride = a_FlatStride / sizeof( float );
+    const uint32_t AffineStride = a_AffineStride / sizeof( float );
+    const uint32_t PerspectiveStride = a_PerspectiveStride / sizeof( float );
 
-    for ( uint32_t i = 0u; i < a_PerspectiveStride; ++i )
+    // We only need to create copies of the perspective portion.
+    float Data0[ 512 ]; memcpy( Data0, a_Data[ 0u ] + FlatStride + AffineStride, a_PerspectiveStride );
+    float Data1[ 512 ]; memcpy( Data1, a_Data[ 1u ] + FlatStride + AffineStride, a_PerspectiveStride );
+    float Data2[ 512 ]; memcpy( Data2, a_Data[ 2u ] + FlatStride + AffineStride, a_PerspectiveStride );
+
+    for ( uint32_t i = 0u; i < PerspectiveStride; ++i )
     {
 	    Data0[ i ] *= a_P[ 0u ].w;
 	    Data1[ i ] *= a_P[ 1u ].w;
@@ -238,9 +244,9 @@ void ConsoleGL::Rasterize( const glm::vec4* a_P, const float** a_Data, const uin
         void* State;
     } State;
 
-	State.FlatStride = a_FlatStride;
-    State.AffineStride = a_AffineStride;
-    State.PerspectiveStride = a_PerspectiveStride;
+	State.FlatStride = FlatStride;
+    State.AffineStride = AffineStride;
+    State.PerspectiveStride = PerspectiveStride;
     State.D = a_Data;
 	State.D0 = Data0;
 	State.D1 = Data1;
@@ -256,19 +262,22 @@ void ConsoleGL::Rasterize( const glm::vec4* a_P, const float** a_Data, const uin
         memcpy( State.Data, State.D[ 0u ], State.FlatStride * sizeof( float ) );
 
         // Interpolate affine, without perspective correction.
-        for ( uint32_t i = State.FlatStride; i < State.FlatStride + State.AffineStride; ++i )
+        const uint32_t OffsetAffine = State.FlatStride;
+        
+        for ( uint32_t i = 0u; i < State.AffineStride; ++i )
         {
-            State.Data[ i ] =
+            State.Data[ i + OffsetAffine ] =
                 State.D[ 0u ][ i ] * a_BarycentricCoord[ 0u ] +
                 State.D[ 1u ][ i ] * a_BarycentricCoord[ 1u ] +
                 State.D[ 2u ][ i ] * a_BarycentricCoord[ 2u ];
         }
 
         const float InvW = 1.0f / a_Position.w;
+        const uint32_t OffsetPerspective = State.FlatStride + State.AffineStride;
 
-        for ( uint32_t i = State.FlatStride + State.AffineStride; i < State.FlatStride + State.AffineStride + State.PerspectiveStride; ++i )
+        for ( uint32_t i = 0u; i < State.PerspectiveStride; ++i )
         {
-            State.Data[ i ] = (
+            State.Data[ i + OffsetPerspective ] = (
                 State.D0[ i ] * a_BarycentricCoord[ 0u ] +
                 State.D1[ i ] * a_BarycentricCoord[ 1u ] + 
                 State.D2[ i ] * a_BarycentricCoord[ 2u ] ) * InvW;

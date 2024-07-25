@@ -13,7 +13,12 @@ via a proprocessor define.
 Using CleanProjectFiles.bat will clear the .vs files, the Generated/Project files and the Lengine.sln.
 Everything inside of the Generated folder is completely ignored by the .gitignore, so you shouldn't have any issues submitting rubbish.
 
+For the shader compiler to work, you need to have the following cmd commands available:
+"premake5" - used to make shader project.
+"devenv" - used to determine Visual Studio version.
+"msbuild" - used to compile shader project.
 
+These are used by the ShaderCompiler.exe to build a project around your shader code, and then compile it into a dll.
 
 Specifying a shader file:
 
@@ -74,7 +79,12 @@ Inbuilts are a form of output or input that communicates to the shading pipeline
 They can not be qualified like the other in and outs. They must have the exact name, type
 and should be in the right shader.
 Vertex inbuilts:
-out vec4 VertPos;
+out vec4 VertPos
+
+Fragment inbuilts:
+out vec4  FragColor
+out float FragDepth
+in  vec4  FragCoord
 
 Below is a basic phong shader written in cgsl:
 

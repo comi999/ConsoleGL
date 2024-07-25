@@ -702,7 +702,7 @@ namespace ConsoleGL
 		return false;
 	}
 	
-	bool GetVarTypeAsUnderlying( const ConsoleGL::EDataType a_VarType, ConsoleGL::EDataType& o_UnderlyingVarType, uint32_t& o_ArraySize )
+	bool GetDataTypeUnderlying( const ConsoleGL::EDataType a_VarType, ConsoleGL::EDataType& o_UnderlyingVarType, uint32_t& o_ArraySize )
 	{
 		switch ( a_VarType )
 	{
@@ -931,7 +931,7 @@ namespace ConsoleGL
 		uint32_t ArraySize;
 		ConsoleGL::EDataType UnderlyingType;
 	
-		if ( !GetVarTypeAsUnderlying( a_DataType, UnderlyingType, ArraySize ) )
+		if ( !GetDataTypeUnderlying( a_DataType, UnderlyingType, ArraySize ) )
 	{
 		return 0u;
 	}
@@ -1186,8 +1186,8 @@ namespace ConsoleGL
 		uint32_t ParamCount;
 		ParamGetter ParamGetters[ MAX_SHADER_PARAMETERS ];
 		ParamSetter ParamSetters[ MAX_SHADER_PARAMETERS ];
-		std::vector< float > ParamData;
-		uint32_t ParameterStride;
+		std::vector< uint8_t > ParamData;
+		uint32_t ParamStride;
 		uint32_t FlatStride;
 		uint32_t AffineStride;
 		uint32_t PerspectiveStride;
@@ -1224,7 +1224,7 @@ namespace ConsoleGL
 		// Initialize values.
 		o_PipelineState.AttribCount = 0u;
 		o_PipelineState.ParamCount = 0u;
-		o_PipelineState.ParameterStride = 0u;
+		o_PipelineState.ParamStride = 0u;
 		o_PipelineState.FlatStride = 0u;
 		o_PipelineState.AffineStride = 0u;
 		o_PipelineState.PerspectiveStride = 0u;
@@ -1250,7 +1250,7 @@ namespace ConsoleGL
 		}
 
 		// Start populating parameters.
-		uint32_t ParameterStride = 0u;
+		uint32_t ParamStride = 0u;
 
 		for ( uint32_t i = 0u; i < MAX_SHADER_PARAMETERS; ++i )
 		{
@@ -1264,7 +1264,7 @@ namespace ConsoleGL
 			++o_PipelineState.ParamCount;
 
 			const ShaderProgramParameter& Parameter = o_PipelineState.ShaderProgram->Parameters[ i ].value();
-			const uint32_t ParameterSize /*in floats*/ = Parameter.Size /*in bytes*/ / sizeof( float );
+			const uint32_t ParameterSize = Parameter.Size;
 
 			o_PipelineState.ParamGetters[ i ].Input = Parameter.DataVertex;
 			o_PipelineState.ParamGetters[ i ].Size = Parameter.Size;
@@ -1274,25 +1274,25 @@ namespace ConsoleGL
 			else if ( Parameter.InterpQual == EShaderInterpQual::Perspective ) o_PipelineState.PerspectiveStride += ParameterSize;
 
 			o_PipelineState.ParamSetters[ i ].Output = Parameter.DataFragment;
-			o_PipelineState.ParamSetters[ i ].Offset = ParameterStride * sizeof( float );
+			o_PipelineState.ParamSetters[ i ].Offset = ParamStride;
 			o_PipelineState.ParamSetters[ i ].Size = Parameter.Size;
 			
-			ParameterStride += ParameterSize;
+			ParamStride += ParameterSize;
 		}
 
-		o_PipelineState.ParameterStride = ParameterStride;
+		o_PipelineState.ParamStride = ParamStride;
 
 		// We need to reserve space for all parameters, but like above, need additional space for clipping data.
-		o_PipelineState.ParamData.resize( o_PipelineState.ParameterStride * o_PipelineState.VertexCount );
+		o_PipelineState.ParamData.resize( o_PipelineState.ParamStride * o_PipelineState.VertexCount );
 
 		// We can now set all of the param setter strides since we know how much data total it occupies per set.
-		ParameterStride = 0u;
+		ParamStride = 0u;
 
 		for ( uint32_t i = 0u; i < o_PipelineState.ParamCount; ++i )
 		{
-			o_PipelineState.ParamGetters[ i ].Output = o_PipelineState.ParamData.data() + ParameterStride;
-			o_PipelineState.ParamGetters[ i ].Stride /*in bytes*/ = o_PipelineState.ParameterStride * sizeof( float ) /*in bytes*/;
-			ParameterStride += o_PipelineState.ParamGetters[ i ].Size;
+			o_PipelineState.ParamGetters[ i ].Output = o_PipelineState.ParamData.data() + ParamStride;
+			o_PipelineState.ParamGetters[ i ].Stride = o_PipelineState.ParamStride;
+			ParamStride += o_PipelineState.ParamGetters[ i ].Size;
 		}
 
 		o_PipelineState.VertPos = ( const glm::vec4* )State.ActiveContext->ActiveShaderProgram->InbuiltVars[ ( size_t )EShaderInbuiltVar::out_vec4_VertPos ];
@@ -1331,9 +1331,9 @@ namespace ConsoleGL
 		Verts[ 2u ] = a_PipelineState.ProcessedVerts[ Index2 ];
 
 		const float* Params[ 3u ];
-		Params[ 0u ] = a_PipelineState.ParamData.data() + Index0 * a_PipelineState.ParameterStride;
-		Params[ 1u ] = a_PipelineState.ParamData.data() + Index1 * a_PipelineState.ParameterStride;
-		Params[ 2u ] = a_PipelineState.ParamData.data() + Index2 * a_PipelineState.ParameterStride;
+		Params[ 0u ] = ( float* )( a_PipelineState.ParamData.data() + Index0 * a_PipelineState.ParamStride );
+		Params[ 1u ] = ( float* )( a_PipelineState.ParamData.data() + Index1 * a_PipelineState.ParamStride );
+		Params[ 2u ] = ( float* )( a_PipelineState.ParamData.data() + Index2 * a_PipelineState.ParamStride );
 
 		const auto RasterFn = +[]( const glm::vec4& a_VertPos, const float* a_Params, const uint32_t, void* a_State )
 		{
@@ -2922,7 +2922,7 @@ bool ConsoleGL::CompileShader( const ShaderHandle a_Shader )
 		}
 
 		// If this is a prsp or affn out, then the underlying type must be float.
-		else if ( Var.StorageQual == EShaderStorageQual::Out && ( Var.InterpQual == EShaderInterpQual::Affine || Var.InterpQual == EShaderInterpQual::Perspective ) && ( !GetVarTypeAsUnderlying( Var.DataType, DataType, ArraySize ) || DataType != EDataType::Float ) )
+		else if ( Var.StorageQual == EShaderStorageQual::Out && ( Var.InterpQual == EShaderInterpQual::Affine || Var.InterpQual == EShaderInterpQual::Perspective ) && ( !GetDataTypeUnderlying( Var.DataType, DataType, ArraySize ) || DataType != EDataType::Float ) )
 		{
 			WriteToShaderInfoLog( "In declaration '%s', non-float type used with '%s'. Only flat can be used with non-float types.\n",
 				Temp.Proc->Info->Variables[ i ].Declaration,
@@ -3169,8 +3169,14 @@ bool ConsoleGL::LinkProgram( const ShaderProgramHandle a_ShaderProgram )
 		}
 	}
 
-	uint32_t CurrentIndex = 0u;
-	
+	uint32_t CurrentFlatIndex = 0u;
+	uint32_t CurrentAffineIndex = 0u;
+	uint32_t CurrentPerspectiveIndex = 0u;
+
+	ShaderProgramParameterArray FlatParams;
+	ShaderProgramParameterArray AffineParams;
+	ShaderProgramParameterArray PerspectiveParams;
+
 	for ( auto Begin = Parameters.begin(), End = Parameters.end(); Begin != End; ++Begin )
 	{
 		if ( Begin->second.first && Begin->second.second )
@@ -3191,15 +3197,22 @@ bool ConsoleGL::LinkProgram( const ShaderProgramHandle a_ShaderProgram )
 				continue;
 			}
 
-			ShaderProgramParameter& Parameter = Temp.Parameters[ CurrentIndex++ ].emplace();
-			Parameter.InterpQual = Begin->second.first->InterpQual;
-			Parameter.DataType = Begin->second.first->DataType;
-			Parameter.DataTypeName = Begin->second.first->DataTypeName;
-			Parameter.Name = Begin->first;
-			Parameter.DataVertex = Begin->second.first->Data;
-			Parameter.DataFragment = Begin->second.second->Data;
-			Parameter.Size = Begin->second.first->Size;
-			Parameter.Length = Begin->second.first->Length;
+			ShaderProgramParameter* Parameter = nullptr;
+
+			if ( Begin->second.first->InterpQual == EShaderInterpQual::Flat ) Parameter = &FlatParams[ CurrentFlatIndex++ ].emplace(); else
+			if ( Begin->second.first->InterpQual == EShaderInterpQual::Affine ) Parameter = &AffineParams[ CurrentAffineIndex++ ].emplace(); else
+			if ( Begin->second.first->InterpQual == EShaderInterpQual::Perspective ) Parameter = &PerspectiveParams[ CurrentPerspectiveIndex++ ].emplace();
+
+			// Parameter here should always not be null here. If it is, something is very wrong.
+
+			Parameter->InterpQual = Begin->second.first->InterpQual;
+			Parameter->DataType = Begin->second.first->DataType;
+			Parameter->DataTypeName = Begin->second.first->DataTypeName;
+			Parameter->Name = Begin->first;
+			Parameter->DataVertex = Begin->second.first->Data;
+			Parameter->DataFragment = Begin->second.second->Data;
+			Parameter->Size = Begin->second.first->Size;
+			Parameter->Length = Begin->second.first->Length;
 		}
 
 		// If only singly linked in vertex shader, do nothing.
@@ -3214,6 +3227,15 @@ bool ConsoleGL::LinkProgram( const ShaderProgramHandle a_ShaderProgram )
 			LinkFailure = true;
 		}
 	}
+
+	// Pack all params into the shader programs array.
+	// The ordering here is important, and is the reason we are delaying copying into the shader program.
+	// Order: Flat, Affine, Perspective.
+	uint32_t CurrentIndex = 0u;
+
+	for ( uint32_t i = 0; i < CurrentFlatIndex; ++i ) Temp.Parameters[ CurrentIndex++ ] = std::move( FlatParams[ i ].value() );
+	for ( uint32_t i = 0; i < CurrentAffineIndex; ++i ) Temp.Parameters[ CurrentIndex++ ] = std::move( AffineParams[ i ].value() );
+	for ( uint32_t i = 0; i < CurrentPerspectiveIndex; ++i ) Temp.Parameters[ CurrentIndex++ ] = std::move( PerspectiveParams[ i ].value() );
 
 	for ( uint32_t i = 0u; i < ( uint32_t )EShaderInbuiltVar::None; ++i )
 	{
@@ -3706,7 +3728,7 @@ bool ConsoleGL::DisableVertexAttribArray( const uint32_t a_Location )
 	return true;
 }
 
-bool ConsoleGL::VertexAttribPointer( const uint32_t a_Location, const uint32_t a_Size, const EDataType a_DataType, const bool a_Normalize, const uint32_t a_Stride, const uint32_t a_Offset )
+bool ConsoleGL::VertexAttribPointer( const uint32_t a_Location, const uint32_t a_ArrayLength, const EDataType a_DataType, const bool a_Normalize, const uint32_t a_Stride, const uint32_t a_Offset )
 {
 	if ( !State.ActiveContext )
 	{
@@ -3730,16 +3752,11 @@ bool ConsoleGL::VertexAttribPointer( const uint32_t a_Location, const uint32_t a
 	VertexAttrib& AttribPointer = VertexArray->Attribs[ a_Location ];
 	AttribPointer.DataType = a_DataType;
 	AttribPointer.Offset = a_Offset;
-	AttribPointer.Size = a_Size;
+	AttribPointer.Size = GetDataTypeSize( a_DataType ) * a_ArrayLength;
 	AttribPointer.Stride = a_Stride;
 	AttribPointer.Normalize = a_Normalize;
 	AttribPointer.Buffer = State.ActiveContext->BufferTargets[ ( size_t )EBufferTarget::ArrayBuffer ];
 	return true;
-}
-
-namespace ConsoleGL
-{
-	
 }
 
 bool ConsoleGL::DrawElements( const EPrimitiveType a_PrimitiveType, const uint32_t a_VertexCount, const uint32_t a_IndexCount, const void* a_Indices, const EDataType a_IndexType )
@@ -3760,8 +3777,6 @@ bool ConsoleGL::DrawElements( const EPrimitiveType a_PrimitiveType, const uint32
 
 	Pipeline.ShaderProgram = State.ActiveContext->ActiveShaderProgram;
 	Pipeline.VertexArray = State.ActiveContext->ActiveVertexArray ? State.ActiveContext->ActiveVertexArray : &State.ActiveContext->DefaultVertexArray;
-	
-	// Need to ascertain the total amount of vertices.
 
 	if ( !InitPipelineState( Pipeline, a_PrimitiveType, a_VertexCount, a_IndexCount, a_Indices, a_IndexType ) )
 	{
