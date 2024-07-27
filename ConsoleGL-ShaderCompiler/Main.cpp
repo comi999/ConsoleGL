@@ -431,8 +431,10 @@ int main( int a_ArgCount, const char** a_Args )
 		return 1;
 	}
 
-	ReturnCode = system( std::vformat( "premake5 --file=\"Temp\\premake5.lua\" vs2022", std::make_format_args( VisualStudioVersion ) ).c_str() ); if ( ReturnCode != 0 ) return 1;
-	ReturnCode = system( "msbuild Temp\\Shader.vcxproj /p:Configuration=Debug /p:Platform=x64" ); if ( ReturnCode != 0 ) return 1;
+	ReturnCode = system( std::vformat( "premake5 --file=\"Temp\\premake5.lua\" {}", std::make_format_args( VisualStudioVersion ) ).c_str() ); if ( ReturnCode != 0 ) return 1;
+	//ReturnCode = system( "msbuild Temp\\Shader.vcxproj /p:Configuration=Debug /p:Platform=x64" ); if ( ReturnCode != 0 ) return 1;
+	//devenv Assimp.sln /build "%CONFIGURATION%|%PLATFORM%" /project code\assimp.vcxproj
+	ReturnCode = system( "devenv \"Temp\\Shader.sln\" /build \"Debug|x64\" /project Shader" ); if ( ReturnCode != 0 ) return 1;
 	ReturnCode = std::filesystem::remove_all( BinaryFile );
 	ReturnCode = std::filesystem::remove_all( OutputFile );
 	ReturnCode = std::filesystem::copy_file( "Temp\\bin\\Shader.dll", BinaryFile ); if ( ReturnCode != 1 ) return 1;

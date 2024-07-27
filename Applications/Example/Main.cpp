@@ -264,7 +264,7 @@ void run()
 		
 		float AspectRatio = ( float )Width / Height;
 		float FOV = glm::radians( 75.0f );
-		float ZNear = 3.0f;
+		float ZNear = 0.1f;
 		float ZFar = 1000.0f;
 
 		glm::vec3 ObjectPos = { 0.0f, 0.0f, 0.0f };
@@ -301,10 +301,10 @@ void run()
 		ConsoleGL::Uniform3f( objectColour_Loc, 1.0f, 1.0f, 1.0f );
 
 		// Bind the cube VAO and draw
-		/*ConsoleGL::UniformMatrix4fv( M_Loc, 1, false, &M0[ 0 ][ 0 ] );
+		ConsoleGL::UniformMatrix4fv( M_Loc, 1, false, &M0[ 0 ][ 0 ] );
 		ConsoleGL::BindVertexArray( VAO[ 0u ] );
 		ConsoleGL::DrawElements( ConsoleGL::EPrimitiveType::Triangles, sizeof( CubeIndices ) / sizeof( int32_t ), CubeIndices, ConsoleGL::EDataType::Int32);
-		ConsoleGL::BindVertexArray( nullptr );*/
+		ConsoleGL::BindVertexArray( nullptr );
 
 		// Bind the floor VAO and draw
 		ConsoleGL::UniformMatrix4fv( M_Loc, 1, false, &M1[ 0 ][ 0 ] );
