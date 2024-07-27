@@ -479,11 +479,23 @@ namespace ConsoleGL
 		//Patches
 	};
 
-	enum class ERenderSetting
+	enum class ERenderSetting : uint8_t
 	{
-		DepthTest,
-		CullFace,
-		Clipping,
+		DepthTest	= 1u << 0u,
+		AlphaBlend	= 1u << 1u,
+		CullFace	= 1u << 2u,
+		Clipping	= 1u << 3u,
+		//...
+	};
+
+	enum class EDepthTest
+	{
+		Greater,
+		GreaterEqual,
+		Lesser,
+		LesserEqual,
+		Equal,
+		NotEqual,
 	};
 
 	using FragmentFn = Pixel( * )( Coord a_Coord, void* a_State );
@@ -564,8 +576,8 @@ namespace ConsoleGL
     CONSOLEGL_API void SetPixelsByPosition( PixelBuffer* a_Buffer, Coord a_Position, uint32_t a_Count, Pixel a_Pixel );
 	CONSOLEGL_API void SetBuffer( PixelBuffer* a_Buffer, Pixel a_Pixel );
 	CONSOLEGL_API void SetBufferFn( PixelBuffer* a_Buffer, FragmentFn a_FragmentFn, void* a_State );
-    CONSOLEGL_API void DrawLine( PixelBuffer* a_Buffer, const Seg& a_Segment, Pixel a_Pixel );
-	CONSOLEGL_API void DrawLineFn( PixelBuffer* a_Buffer, const Seg& a_Segment, FragmentFn a_FragmentFn, void* a_State );
+    CONSOLEGL_API void DrawLine( PixelBuffer* a_Buffer, const Seg& a_Seg, Pixel a_Pixel );
+	CONSOLEGL_API void DrawLineFn( PixelBuffer* a_Buffer, const Seg& a_Seg, FragmentFn a_FragmentFn, void* a_State );
     CONSOLEGL_API void DrawHorizontalLine( PixelBuffer* a_Buffer, Coord a_Begin, uint32_t a_Length, Pixel a_Pixel );
     CONSOLEGL_API void DrawHorizontalLineFn( PixelBuffer* a_Buffer, Coord a_Begin, uint32_t a_Length, FragmentFn a_FragmentFn, void* a_State );
     CONSOLEGL_API void DrawVerticalLine( PixelBuffer* a_Buffer, Coord a_Begin, uint32_t a_Length, Pixel a_Pixel );
@@ -621,12 +633,15 @@ namespace ConsoleGL
 	CONSOLEGL_API bool CreateBuffers( uint32_t a_Count, BufferHandle* o_Buffers );
 	CONSOLEGL_API bool BindBuffer( EBufferTarget a_BufferTarget, BufferHandle a_Buffer );
 	CONSOLEGL_API bool DeleteBuffers( uint32_t a_Count, const BufferHandle* a_Buffers );
-	//CONSOLEGL_API bool IsBuffer( BufferHandle a_Handle );
 	//CONSOLEGL_API bool ViewPort( size_t a_X, size_t a_Y, size_t a_Width, size_t a_Height );
 	CONSOLEGL_API bool UseProgram( ShaderProgramHandle a_ShaderProgram );
 	//CONSOLEGL_API void Clear( uint8_t a_Flags );
-	//CONSOLEGL_API void ClearColour( float a_R, float a_G, float a_B, float a_A );
-	//CONSOLEGL_API void ClearDepth( float a_ClearDepth );
+	CONSOLEGL_API bool SetClearColour( Colour a_ClearColour );
+	CONSOLEGL_API bool SetClearDepth( float a_ClearDepth );
+	CONSOLEGL_API bool SetDepthTest( EDepthTest a_DepthTest );
+	CONSOLEGL_API bool Clear();
+	CONSOLEGL_API bool ClearColour();
+	CONSOLEGL_API bool ClearDepth();
 	//CONSOLEGL_API void DrawArrays( RenderMode a_Mode, uint32_t a_Begin, uint32_t a_Count );
 	CONSOLEGL_API bool BufferData( EBufferTarget a_BufferTarget, size_t a_Size, const void* a_Data/*, DataUsage a_DataUsage */);
 	//CONSOLEGL_API void NamedBufferData( BufferHandle a_Handle, size_t a_Size, const void* a_Data, DataUsage a_DataUsage );
@@ -636,9 +651,9 @@ namespace ConsoleGL
 	CONSOLEGL_API bool EnableVertexAttribArray( uint32_t a_Location );
 	CONSOLEGL_API bool DisableVertexAttribArray( uint32_t a_Location );
 	CONSOLEGL_API bool VertexAttribPointer( uint32_t a_Location, uint32_t a_ArrayLength, EDataType a_DataType, bool a_Normalize, uint32_t a_Stride, uint32_t a_Offset );
-	CONSOLEGL_API bool DrawElements( EPrimitiveType a_PrimitiveType, uint32_t a_VertexCount, uint32_t a_IndexCount, const void* a_Indices, EDataType a_IndexType );
-	//CONSOLEGL_API void Enable( RenderSetting a_RenderSetting ); // clipping too
-	//CONSOLEGL_API void Disable( RenderSetting a_RenderSetting );
+	CONSOLEGL_API bool DrawElements( EPrimitiveType a_PrimitiveType, uint32_t a_IndexCount, const void* a_Indices, EDataType a_IndexType );
+	CONSOLEGL_API bool Enable( ERenderSetting a_RenderSetting );
+	CONSOLEGL_API bool Disable( ERenderSetting a_RenderSetting );
 	//CONSOLEGL_API void CullFace( CullFaceMode a_CullFace );
 	//CONSOLEGL_API void DepthFunc( TextureSetting a_TextureSetting );
 	//CONSOLEGL_API void GetBooleanv( RenderSetting a_RenderSetting, bool* a_Value );

@@ -1159,7 +1159,7 @@ namespace ConsoleGL
 		struct VertexEntry
 		{
 			glm::vec4 Position;
-			uint8_t OutsideClipspace = 0u;
+			bool OutsideClipspace = false;
 		};
 
 		struct TrianglePrimitive

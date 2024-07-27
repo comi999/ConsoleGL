@@ -55,3 +55,7 @@ project "ConsoleGL-Static"
 	
 	filter "platforms:Win64"
 		architecture "x86_64"
+		
+	-- Enable /bigobj flag
+	filter { "system:windows" }
+		buildoptions { "/bigobj" }
