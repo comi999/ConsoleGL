@@ -68,6 +68,8 @@
 // VAO can be created, bound, and destroyed, references stay alive.
 // VBO can be created, bound, and destroyed, references stay alive.
 // Remove requirement for attribs and uniforms to need locations. (Can they be auto assigned?)
+// Need to add text functions.
+// Need to add drawing functions that affect main window.
 
 ConsoleGL::EError ConsoleGL::GetLastError()
 {
@@ -1159,7 +1161,7 @@ namespace ConsoleGL
 		struct VertexEntry
 		{
 			glm::vec4 Position;
-			uint8_t OutsideClipspace = 0u;
+			uint8_t Outside = 0u;
 		};
 
 		struct TrianglePrimitive
@@ -1167,13 +1169,22 @@ namespace ConsoleGL
 			int64_t Index0;
 			int64_t Index1;
 			int64_t Index2;
-			uint8_t Outsides = 0b000;
+			uint8_t Outside0 = 0u;
+			uint8_t Outside1 = 0u;
+			uint8_t Outside2 = 0u;
+		};
+
+		struct ClippedTriangle
+		{
+			glm::vec4 Verts[ 3u ];
+			float* Params[ 3u ];
 		};
 
 		static std::vector< uint8_t >			ParamOutput;			ParamOutput.clear();
 		static std::vector< VertexEntry >		ProcessedVertices;		ProcessedVertices.clear();
 		static std::vector< TrianglePrimitive > ProcessedPrimitives;	ProcessedPrimitives.clear();
 		static std::vector< TrianglePrimitive > PrimitivesToClip;		PrimitivesToClip.clear();
+		static std::vector< ClippedTriangle >	ClippedPrimitives;		ClippedPrimitives.clear();
 
 		for ( uint32_t i = 0u; i < a_IndexCount; i += 3u )
 		{
@@ -1206,13 +1217,16 @@ namespace ConsoleGL
 				VertShader();
 
 				// Collect the vertex.
-				auto& [ Position, OutsideClipspace ] = ProcessedVertices.emplace_back( *VertPos );
+				auto& [ Position, Outside ] = ProcessedVertices.emplace_back( *VertPos );
 
 				// Is the vertex outside of clip-space?
-				OutsideClipspace = Position.w <= 0 || 
-					Position.x < -Position.w || Position.x > Position.w ||
-					Position.y < -Position.w || Position.y > Position.w ||
-					Position.z < -Position.w || Position.z > Position.w;
+				Outside |= ( Position.x < -Position.w ) << 0u;
+				Outside |= ( Position.x > +Position.w ) << 1u;
+				Outside |= ( Position.y < -Position.w ) << 2u;
+				Outside |= ( Position.y > +Position.w ) << 3u;
+				Outside |= ( Position.z < -Position.w ) << 4u;
+				Outside |= ( Position.z > +Position.w ) << 5u;
+
 
 				// Process parameters.
 				for ( uint32_t j = 0u; j < ParamLinkCount; ++j )
@@ -1222,30 +1236,71 @@ namespace ConsoleGL
 				}
 			}
 
-			Primitive.Outsides |= ProcessedVertices[ Primitive.Index0 ].OutsideClipspace << 0u;
-			Primitive.Outsides |= ProcessedVertices[ Primitive.Index1 ].OutsideClipspace << 1u;
-			Primitive.Outsides |= ProcessedVertices[ Primitive.Index2 ].OutsideClipspace << 2u;
+			Primitive.Outside0 = ProcessedVertices[ Primitive.Index0 ].Outside;
+			Primitive.Outside1 = ProcessedVertices[ Primitive.Index1 ].Outside;
+			Primitive.Outside2 = ProcessedVertices[ Primitive.Index2 ].Outside;
 
 			// If this triangle is wholly inside clip space, no need to clip.
-			if ( Primitive.Outsides == 0b000 )
+			if ( !Primitive.Outside0 && !Primitive.Outside1 && !Primitive.Outside2 )
 			{
 				ProcessedPrimitives.push_back( Primitive );
 			}
-
-			// If not wholly inside, but also not wholly outside, then it needs to be clipped.
-			else if ( Primitive.Outsides != 0b111 )
+			else
 			{
 				PrimitivesToClip.push_back( Primitive );
 			}
-
-			// If wholly outside, then we won't even draw it.
-			else;
 		}
 
 		// Clip primitives and place into queue.
 		if constexpr ( ClippingEnabled )
 		{
-			
+			//constexpr uint32_t NegXClipMask = 0b000001000001000001;
+			//constexpr uint32_t PosXClipMask = 0b000010000010000010;
+			//constexpr uint32_t NegYClipMask = 0b000100000100000100;
+			//constexpr uint32_t PosYClipMask = 0b001000001000001000;
+			//constexpr uint32_t NegZClipMask = 0b010000010000010000;
+			//constexpr uint32_t PosZClipMask = 0b100000100000100000;
+
+			auto Clip = []( uint8_t a_Outsides, glm::vec4* o_Positions, float** o_Data )
+			{
+				
+			};
+
+			// This represents the point at which newly clipped triangles will be getting added.
+			uint32_t ClippingOffset = ProcessedPrimitives.size();
+
+			// Go through all Primitives to clip, and clip against x < -w
+			for ( uint32_t i = 0u; i < PrimitivesToClip.size(); ++i )
+			{
+				TrianglePrimitive& Primitive = PrimitivesToClip[ i ];
+
+				// Create clip mask.
+				uint8_t Clipmask = 0u;
+				Clipmask |= !!Primitive.Outside0 << 0u;
+				Clipmask |= !!Primitive.Outside0 << 1u;
+				Clipmask |= !!Primitive.Outside0 << 2u;
+
+				// If all three points are outside of the clip plane, discard the whole triangle.
+				if ( Clipmask == 0b111 )
+				{
+					continue;
+				}
+				
+				// If all three points are inside of the clip plane, enqueue without clipping.
+				if ( Clipmask == 0b000 )
+				{
+					ProcessedPrimitives.push_back( Primitive );
+					continue;
+				}
+
+				// If a 1 or 2 are outside of clip plane, then we need to clip.
+				glm::vec4 Verts[ 4u ];
+				Verts[ 0u ] = ProcessedVertices[ Primitive.Index0 ].Position;
+				Verts[ 1u ] = ProcessedVertices[ Primitive.Index1 ].Position;
+				Verts[ 2u ] = ProcessedVertices[ Primitive.Index2 ].Position;
+
+				//Clip( Clipmask, Verts,  )
+			}
 		}
 
 		// Transform all vertices into screen space
@@ -1363,21 +1418,21 @@ namespace ConsoleGL
 				int32_t MinY = std::min( { Verts[ 0u ].y, Verts[ 1u ].y, Verts[ 2u ].y } );
 				int32_t MaxY = std::max( { Verts[ 0u ].y, Verts[ 1u ].y, Verts[ 2u ].y } );
 				
-				if ( Primitive.Outsides & 0b001 )
+				if ( Primitive.Outside0 & 0b001 )
 				{
 					if ( Verts[ 0u ].x < 0.0f ) MinX = 0;
 					if ( Verts[ 0u ].x > ( float )State.ActiveWindow->Width ) MaxX = State.ActiveWindow->Width;
 					if ( Verts[ 0u ].y < 0.0f ) MinY = 0;
 					if ( Verts[ 0u ].y > ( float )State.ActiveWindow->Height ) MaxY = State.ActiveWindow->Height;
 				}
-				if ( Primitive.Outsides & 0b010 )
+				if ( Primitive.Outside1 & 0b010 )
 				{
 					if ( Verts[ 1u ].x < 0.0f ) MinX = 0;
 					if ( Verts[ 1u ].x > ( float )State.ActiveWindow->Width ) MaxX = State.ActiveWindow->Width;
 					if ( Verts[ 1u ].y < 0.0f ) MinY = 0;
 					if ( Verts[ 1u ].y > ( float )State.ActiveWindow->Height ) MaxY = State.ActiveWindow->Height;
 				}
-				if ( Primitive.Outsides & 0b100 )
+				if ( Primitive.Outside2 & 0b100 )
 				{
 					if ( Verts[ 2u ].x < 0.0f ) MinX = 0;
 					if ( Verts[ 2u ].x > ( float )State.ActiveWindow->Width ) MaxX = State.ActiveWindow->Width;
@@ -1385,7 +1440,7 @@ namespace ConsoleGL
 					if ( Verts[ 2u ].y > ( float )State.ActiveWindow->Height ) MaxY = State.ActiveWindow->Height;
 				}
 
-				RasterizeTriangleClipped(
+				/*RasterizeTriangleClipped(
 					{ ( uint32_t )MinX, ( uint32_t )MinY, ( uint32_t )( MaxX - MinX ), ( uint32_t )( MaxY - MinY ) },
 					Verts,
 					Params, 
@@ -1394,7 +1449,7 @@ namespace ConsoleGL
 					PerspectiveStride, 
 					RasterFn, 
 					nullptr
-				);
+				);*/
 			}
 		}
 	}
@@ -2282,10 +2337,6 @@ uint32_t ConsoleGL::GetPixelBufferHeight( PixelBuffer* a_Buffer )
 	return a_Buffer->GetHeight();
 }
 
-#pragma endregion
-
-#pragma region Basic drawing functions
-
 void ConsoleGL::SetPixel( PixelBuffer* a_Buffer, const uint32_t a_Index, const Pixel a_Pixel )
 {
 	a_Buffer->SetElement( a_Index, a_Pixel );
@@ -2444,6 +2495,23 @@ void ConsoleGL::DrawEllipseFilled( PixelBuffer* a_Buffer, const Coord a_Centre, 
 void ConsoleGL::DrawEllipseFilledFn( PixelBuffer* a_Buffer, const Coord a_Centre, const Coord a_Radius, const FragmentFn a_FragmentFn, void* a_State )
 {
 	a_Buffer->DrawEllipseFilled( a_Centre, a_Radius, a_FragmentFn, a_State );
+}
+
+// Text
+
+void ConsoleGL::Write( PixelBuffer* a_Buffer, const Coord a_Origin, const EConsoleColour a_Foreground, const EConsoleColour a_Background, const char* a_String )
+{
+	Pixel* Begin = a_Buffer->GetElements() + a_Origin.y * a_Buffer->GetWidth() + a_Origin.x;
+
+	while ( *a_String )
+	{
+		Begin->SetForeground( a_Foreground );
+		Begin->SetBackground( a_Background );
+		Begin->Symbol = *a_String;
+
+		++Begin;
+		++a_String;
+	}
 }
 
 #pragma endregion

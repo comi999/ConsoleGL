@@ -150,10 +150,10 @@ void run()
 	};
 
 	const VertexData FloorVertices[] = {
-		{ /*Vertex*/ { -1.5f, -1.5f, +1.5f }, /*Colour*/ { 1.0f, 0.0f, 0.0f, 1.0f }, /*Normals*/ { 0.0f, 1.0f, 0.0f } }, // Floor left front
-		{ /*Vertex*/ { +1.5f, -1.5f, +1.5f }, /*Colour*/ { 1.0f, 0.0f, 0.0f, 1.0f }, /*Normals*/ { 0.0f, 1.0f, 0.0f } }, // Floor right front
-		{ /*Vertex*/ { +1.5f, -1.5f, -1.5f }, /*Colour*/ { 1.0f, 0.0f, 0.0f, 1.0f }, /*Normals*/ { 0.0f, 1.0f, 0.0f } }, // Floor right back
-		{ /*Vertex*/ { -1.5f, -1.5f, -1.5f }, /*Colour*/ { 1.0f, 0.0f, 0.0f, 1.0f }, /*Normals*/ { 0.0f, 1.0f, 0.0f } }, // Floor left back
+		{ /*Vertex*/ { -1.5f, -1.5f, +1.5f }, /*Colour*/ { 1.0f, 0.0f, 0.0f, 1.0f }, /*Normals*/ { -0.376f, +0.376f, +0.376f } }, // Floor left front
+		{ /*Vertex*/ { +1.5f, -1.5f, +1.5f }, /*Colour*/ { 1.0f, 1.0f, 0.0f, 1.0f }, /*Normals*/ { +0.376f, +0.376f, +0.376f } }, // Floor right front
+		{ /*Vertex*/ { +1.5f, -1.5f, -1.5f }, /*Colour*/ { 1.0f, 1.0f, 1.0f, 1.0f }, /*Normals*/ { +0.376f, +0.376f, -0.376f } }, // Floor right back
+		{ /*Vertex*/ { -1.5f, -1.5f, -1.5f }, /*Colour*/ { 0.0f, 0.0f, 1.0f, 1.0f }, /*Normals*/ { -0.376f, +0.376f, -0.376f } }, // Floor left back
 	};
 
 	const int32_t CubeIndices[] = {
@@ -311,6 +311,8 @@ void run()
 		ConsoleGL::BindVertexArray( VAO[ 1u ] );
 		ConsoleGL::DrawElements( ConsoleGL::EPrimitiveType::Triangles, sizeof( FloorIndices ) / sizeof( int32_t ), FloorIndices, ConsoleGL::EDataType::Int32);
 		ConsoleGL::BindVertexArray( nullptr );
+
+		ConsoleGL::Write( ConsoleGL::GetWindowBuffer( ConsoleGL::GetActiveWindow() ), { 0u, 0u }, ConsoleGL::EConsoleColour::BLACK, ConsoleGL::EConsoleColour::WHITE, "Hi there world!!!" );
 
 		ConsoleGL::SwapWindowBuffer();
 		ConsoleGL::UseProgram( nullptr );

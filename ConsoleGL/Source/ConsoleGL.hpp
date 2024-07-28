@@ -565,11 +565,6 @@ namespace ConsoleGL
 	CONSOLEGL_API uint32_t GetPixelBufferSize( PixelBuffer* a_Buffer );
 	CONSOLEGL_API uint32_t GetPixelBufferWidth( PixelBuffer* a_Buffer );
 	CONSOLEGL_API uint32_t GetPixelBufferHeight( PixelBuffer* a_Buffer );
-
-#pragma endregion
-
-#pragma region Basic drawing functions
-
 	CONSOLEGL_API void SetPixel( PixelBuffer* a_Buffer, uint32_t a_Index, Pixel a_Pixel );
 	CONSOLEGL_API void SetPixelByPosition( PixelBuffer* a_Buffer, Coord a_Position, Pixel a_Pixel );
     CONSOLEGL_API void SetPixels( PixelBuffer* a_Buffer, uint32_t a_Index, uint32_t a_Count, Pixel a_Pixel );
@@ -602,6 +597,9 @@ namespace ConsoleGL
     CONSOLEGL_API void DrawEllipseFn( PixelBuffer* a_Buffer, Coord a_Centre, Coord a_Radius, FragmentFn a_FragmentFn, void* a_State );
     CONSOLEGL_API void DrawEllipseFilled( PixelBuffer* a_Buffer, Coord a_Centre, Coord a_Radius, Pixel a_Pixel );
     CONSOLEGL_API void DrawEllipseFilledFn( PixelBuffer* a_Buffer, Coord a_Centre, Coord a_Radius, FragmentFn a_FragmentFn, void* a_State );
+
+	// Text
+    CONSOLEGL_API void Write( PixelBuffer* a_Buffer, Coord a_Origin, EConsoleColour a_Foreground, EConsoleColour a_Background, const char* a_String );
 
 #pragma endregion
 
